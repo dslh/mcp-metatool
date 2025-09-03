@@ -16,6 +16,38 @@ type StarLarkResult struct {
 	Logs   []string    `json:"logs,omitempty"`
 }
 
+func filterUserGlobals(modGlobals, predeclared starlark.StringDict) starlark.StringDict {
+	filtered := make(starlark.StringDict)
+	for name, value := range modGlobals {
+		// Skip predeclared variables (like 'params')
+		if _, isPredeclared := predeclared[name]; isPredeclared {
+			continue
+		}
+		// Skip built-in functions and types
+		if isBuiltinName(name) {
+			continue
+		}
+		filtered[name] = value
+	}
+	return filtered
+}
+
+func isBuiltinName(name string) bool {
+	// Common Starlark built-ins to exclude
+	builtins := []string{
+		"True", "False", "None",
+		"bool", "dict", "enumerate", "float", "getattr", "hasattr",
+		"int", "len", "list", "max", "min", "print", "range",
+		"repr", "reversed", "sorted", "str", "tuple", "type", "zip",
+	}
+	for _, builtin := range builtins {
+		if name == builtin {
+			return true
+		}
+	}
+	return false
+}
+
 func executeStarlark(code string, params map[string]interface{}) (*StarLarkResult, error) {
 	thread := &starlark.Thread{Name: "eval_starlark"}
 	globals := starlark.StringDict{}
@@ -44,12 +76,23 @@ func executeStarlark(code string, params map[string]interface{}) (*StarLarkResul
 		if execErr != nil {
 			return &StarLarkResult{Error: fmt.Sprintf("Execution error: %v", execErr)}, nil
 		}
-		// Look for a return value in globals
-		if returnVal, ok := modGlobals["return"]; ok {
-			result = returnVal
+		// Look for a 'result' variable first, then fallback to all globals
+		if resultVal, ok := modGlobals["result"]; ok {
+			result = resultVal
 		} else {
-			// No explicit return, return the modified globals
-			result = starlark.None
+			// No explicit result variable - return filtered globals as a dict
+			filteredGlobals := filterUserGlobals(modGlobals, globals)
+			if len(filteredGlobals) == 0 {
+				// No user variables - return None
+				result = starlark.None
+			} else {
+				// Convert filtered globals to Starlark dict
+				globalsDict := starlark.NewDict(len(filteredGlobals))
+				for k, v := range filteredGlobals {
+					globalsDict.SetKey(starlark.String(k), v)
+				}
+				result = globalsDict
+			}
 		}
 	} else {
 		// Single expression - evaluate directly
