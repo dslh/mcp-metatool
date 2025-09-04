@@ -18,10 +18,11 @@ type Result struct {
 // Execute runs Starlark code with optional parameters and returns the result
 func Execute(code string, params map[string]interface{}) (*Result, error) {
 	thread := &starlark.Thread{Name: "eval_starlark"}
-	// Start with all standard Starlark built-ins
-	globals := make(starlark.StringDict)
+	
+	// Set up predeclared identifiers (built-ins + params)
+	predeclared := make(starlark.StringDict)
 	for name, value := range starlark.Universe {
-		globals[name] = value
+		predeclared[name] = value
 	}
 
 	// Convert params to Starlark values if provided
@@ -34,7 +35,7 @@ func Execute(code string, params map[string]interface{}) (*Result, error) {
 			}
 			paramsDict.SetKey(starlark.String(k), val)
 		}
-		globals["params"] = paramsDict
+		predeclared["params"] = paramsDict
 	}
 
 	// Execute the Starlark code
@@ -53,7 +54,7 @@ func Execute(code string, params map[string]interface{}) (*Result, error) {
 	// Try as expression first, then as statements
 	if strings.Contains(code, "\n") || strings.Contains(code, "return") {
 		// Multi-line or contains return - execute as program
-		modGlobals, execErr := starlark.ExecFileOptions(fileOptions, thread, "<eval>", code, globals)
+		modGlobals, execErr := starlark.ExecFileOptions(fileOptions, thread, "<eval>", code, predeclared)
 		if execErr != nil {
 			return &Result{Error: fmt.Sprintf("Execution error: %v", execErr)}, nil
 		}
@@ -62,7 +63,7 @@ func Execute(code string, params map[string]interface{}) (*Result, error) {
 			result = resultVal
 		} else {
 			// No explicit result variable - return filtered globals as a dict
-			filteredGlobals := filterUserGlobals(modGlobals, globals)
+			filteredGlobals := filterUserGlobals(modGlobals, predeclared)
 			if len(filteredGlobals) == 0 {
 				// No user variables - return None
 				result = starlark.None
@@ -77,7 +78,7 @@ func Execute(code string, params map[string]interface{}) (*Result, error) {
 		}
 	} else {
 		// Single expression - evaluate directly
-		result, err = starlark.EvalOptions(fileOptions, thread, "<eval>", code, globals)
+		result, err = starlark.EvalOptions(fileOptions, thread, "<eval>", code, predeclared)
 		if err != nil {
 			return &Result{Error: fmt.Sprintf("Evaluation error: %v", err)}, nil
 		}
