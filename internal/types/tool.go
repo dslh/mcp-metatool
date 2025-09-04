@@ -1,7 +1,5 @@
 package types
 
-import "encoding/json"
-
 // SaveToolArgs defines the arguments for the save_tool MCP tool
 type SaveToolArgs struct {
 	Name        string                 `json:"name" jsonschema:"Tool identifier"`
@@ -11,10 +9,6 @@ type SaveToolArgs struct {
 }
 
 // SavedToolParams provides a flexible parameter structure for saved tools
-// This allows the MCP framework to properly validate parameters while still
-// allowing dynamic parameter schemas from saved tool definitions
-type SavedToolParams struct {
-	// Use json.RawMessage to preserve the original JSON structure
-	// This allows us to handle any parameter schema dynamically
-	Parameters json.RawMessage `json:"parameters,omitempty"`
-}
+// This struct accepts any JSON object and allows the MCP framework to validate
+// against the dynamic schemas from saved tool definitions
+type SavedToolParams map[string]interface{}

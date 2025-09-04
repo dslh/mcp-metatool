@@ -10,6 +10,7 @@ import (
 	"github.com/dslh/mcp-metatool/internal/persistence"
 	"github.com/dslh/mcp-metatool/internal/starlark"
 	"github.com/dslh/mcp-metatool/internal/tools"
+	"github.com/dslh/mcp-metatool/internal/types"
 )
 
 func main() {
@@ -46,7 +47,7 @@ func registerSavedTools(server *mcp.Server) error {
 		mcp.AddTool(server, &mcp.Tool{
 			Name:        toolDef.Name,
 			Description: toolDef.Description,
-		}, func(ctx context.Context, req *mcp.CallToolRequest, args map[string]interface{}) (*mcp.CallToolResult, any, error) {
+		}, func(ctx context.Context, req *mcp.CallToolRequest, args types.SavedToolParams) (*mcp.CallToolResult, any, error) {
 			return handleSavedTool(toolDef, args)
 		})
 		log.Printf("Registered saved tool: %s", tool.Name)
@@ -56,7 +57,7 @@ func registerSavedTools(server *mcp.Server) error {
 }
 
 // handleSavedTool executes a saved tool by running its Starlark code
-func handleSavedTool(tool *persistence.SavedToolDefinition, args map[string]interface{}) (*mcp.CallToolResult, any, error) {
+func handleSavedTool(tool *persistence.SavedToolDefinition, args types.SavedToolParams) (*mcp.CallToolResult, any, error) {
 	// Execute the tool's Starlark code with the provided arguments
 	result, err := starlark.Execute(tool.Code, args)
 	if err != nil {
@@ -80,5 +81,5 @@ func handleSavedTool(tool *persistence.SavedToolDefinition, args map[string]inte
 		Content: []mcp.Content{
 			&mcp.TextContent{Text: fmt.Sprintf("Result: %v", result.Result)},
 		},
-	}, result.Result, nil
+	}, result, nil
 }
