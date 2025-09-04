@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"go.starlark.net/starlark"
+	"go.starlark.net/syntax"
 )
 
 // Result represents the result of executing Starlark code
@@ -17,7 +18,11 @@ type Result struct {
 // Execute runs Starlark code with optional parameters and returns the result
 func Execute(code string, params map[string]interface{}) (*Result, error) {
 	thread := &starlark.Thread{Name: "eval_starlark"}
-	globals := starlark.StringDict{}
+	// Start with all standard Starlark built-ins
+	globals := make(starlark.StringDict)
+	for name, value := range starlark.Universe {
+		globals[name] = value
+	}
 
 	// Convert params to Starlark values if provided
 	if params != nil {
@@ -36,10 +41,19 @@ func Execute(code string, params map[string]interface{}) (*Result, error) {
 	var result starlark.Value
 	var err error
 
+	// Configure Starlark with full language features
+	fileOptions := &syntax.FileOptions{
+		Set:             true, // Enable set literals and comprehensions
+		While:           true, // Enable while loops
+		TopLevelControl: true, // Enable for loops and if statements at top level
+		GlobalReassign:  true, // Allow reassignment of global variables
+		LoadBindsGlobally: true, // Load statements bind globally
+	}
+
 	// Try as expression first, then as statements
 	if strings.Contains(code, "\n") || strings.Contains(code, "return") {
 		// Multi-line or contains return - execute as program
-		modGlobals, execErr := starlark.ExecFile(thread, "<eval>", code, globals)
+		modGlobals, execErr := starlark.ExecFileOptions(fileOptions, thread, "<eval>", code, globals)
 		if execErr != nil {
 			return &Result{Error: fmt.Sprintf("Execution error: %v", execErr)}, nil
 		}
@@ -63,7 +77,7 @@ func Execute(code string, params map[string]interface{}) (*Result, error) {
 		}
 	} else {
 		// Single expression - evaluate directly
-		result, err = starlark.Eval(thread, "<eval>", code, globals)
+		result, err = starlark.EvalOptions(fileOptions, thread, "<eval>", code, globals)
 		if err != nil {
 			return &Result{Error: fmt.Sprintf("Evaluation error: %v", err)}, nil
 		}
