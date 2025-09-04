@@ -1,14 +1,15 @@
 # MCP Metatool
 
-A Model Context Protocol (MCP) server implementation in Go that acts as a proxy for other MCP servers and provides meta-functionality for tool composition using Starlark scripts.
+A Model Context Protocol (MCP) server implementation in Go that enables tool composition using Starlark scripts. Create, save, and execute custom composite tools that combine logic and data processing capabilities.
 
 ## Current Status
 
 The server now includes:
-- ✅ **Starlark Runtime**: Execute arbitrary Starlark code with parameter passing
-- ✅ **Flexible Result Handling**: Support both explicit `result` variables and automatic globals capture
-- ✅ **Clean Architecture**: Modular codebase ready for extension
-- 🚧 **Tool Composition**: Coming soon - save and execute composite tools
+- ✅ **Starlark Runtime**: Execute arbitrary Starlark code with parameter passing and flexible result handling
+- ✅ **Tool Composition**: Save and execute custom composite tools written in Starlark
+- ✅ **Dynamic Tool Loading**: Saved tools are automatically loaded and registered at startup
+- ✅ **File-based Persistence**: Tools stored as JSON files with configurable directory
+- ✅ **Clean Architecture**: Modular, well-tested codebase ready for extension
 
 ## Installation
 
@@ -30,6 +31,10 @@ The server communicates over stdio using the MCP protocol. Add it to your Claude
   }
 }
 ```
+
+### Environment Variables
+
+- `MCP_METATOOL_DIR`: Override the default storage directory (`~/.mcp-metatool`)
 
 ## Available Tools
 
@@ -65,24 +70,61 @@ result = {
 # Returns: {"original": [1,2,3,4,5], "processed": [2,4,6,8,10], "count": 5}
 ```
 
-Multiple variables (no explicit result):
-```python
-name = "Alice"
-age = 30
-scores = [95, 87, 92]
-# Returns: {"name": "Alice", "age": 30, "scores": [95, 87, 92]}
+### save_tool
+
+Create or update a composite tool definition that can be executed later.
+
+**Parameters:**
+- `name` (string): Tool identifier
+- `description` (string): Human-readable description of what the tool does
+- `inputSchema` (object): JSON Schema for tool parameters
+- `code` (string): Starlark implementation of the tool
+
+**Example:**
+```javascript
+// Create a greeting tool
+{
+  "name": "greet_user",
+  "description": "A simple greeting tool that takes a name parameter",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "The name to greet"
+      }
+    },
+    "required": ["name"]
+  },
+  "code": "name = params.get('name', 'World')\nresult = 'Hello, ' + name + '!'"
+}
+```
+
+### Dynamic Saved Tools
+
+Once saved with `save_tool`, custom tools become available as regular MCP tools. For example, the `greet_user` tool above becomes callable with:
+
+```javascript
+// Call the saved tool
+greet_user({"name": "Alice"})  // Returns: "Hello, Alice!"
 ```
 
 ## Project Structure
 
 ```
-├── main.go                 # Server setup and tool registration
+├── main.go                 # Server setup and initialization
 ├── internal/
+│   ├── persistence/
+│   │   └── storage.go      # File-based tool persistence
 │   ├── starlark/
 │   │   ├── executor.go     # Starlark execution engine
 │   │   └── convert.go      # Go<->Starlark value conversion
-│   └── tools/
-│       └── eval.go         # eval_starlark tool definition
+│   ├── tools/
+│   │   ├── eval.go         # eval_starlark tool
+│   │   ├── save.go         # save_tool tool
+│   │   └── saved.go        # Dynamic saved tool registration
+│   └── types/
+│       └── tool.go         # Type definitions
 └── spec.md                 # Full project specification
 ```
 
@@ -92,13 +134,22 @@ Built using:
 - [Official MCP Go SDK](https://github.com/modelcontextprotocol/go-sdk)
 - [Starlark in Go](https://pkg.go.dev/go.starlark.net/starlark)
 
+Run tests:
+```bash
+go test ./...
+```
+
+## Storage
+
+Saved tools are stored as JSON files in `~/.mcp-metatool/tools/` (or `$MCP_METATOOL_DIR/tools/`). Each tool is saved as `{toolname}.json` with the complete tool definition including metadata.
+
 ## Roadmap
 
 **Next Phase**:
-- `save_tool`: Create and persist composite tools written in Starlark
 - `list_saved_tools`, `show_saved_tool`, `delete_saved_tool`: Tool management API
-- File-based persistence for saved tools
+- Input schema validation for saved tools
 
 **Future**:
 - MCP server proxying: Connect to upstream MCP servers and expose their tools in Starlark
 - Advanced tool composition patterns and examples
+- Tool versioning and migration support
