@@ -18,6 +18,11 @@ func main() {
 	// Register built-in tools
 	tools.RegisterEvalStarlark(server)
 	tools.RegisterSaveTool(server)
+	
+	// Register tool management tools
+	tools.RegisterListSavedTools(server)
+	tools.RegisterShowSavedTool(server)
+	tools.RegisterDeleteSavedTool(server)
 
 	// Load and register saved tools
 	if err := tools.RegisterSavedTools(server); err != nil {

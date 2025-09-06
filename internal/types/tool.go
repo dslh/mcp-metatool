@@ -12,3 +12,13 @@ type SaveToolArgs struct {
 // This struct accepts any JSON object and allows the MCP framework to validate
 // against the dynamic schemas from saved tool definitions
 type SavedToolParams map[string]interface{}
+
+// ShowToolArgs defines the arguments for the show_saved_tool MCP tool
+type ShowToolArgs struct {
+	Name string `json:"name" jsonschema:"Tool name to display"`
+}
+
+// DeleteToolArgs defines the arguments for the delete_saved_tool MCP tool
+type DeleteToolArgs struct {
+	Name string `json:"name" jsonschema:"Tool name to delete"`
+}
