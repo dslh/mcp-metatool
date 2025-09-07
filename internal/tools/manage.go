@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -14,6 +15,11 @@ import (
 type ToolSummary struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
+}
+
+// ToolListResponse wraps the tool list in an object structure expected by MCP
+type ToolListResponse struct {
+	Tools []ToolSummary `json:"tools"`
 }
 
 // RegisterListSavedTools registers the list_saved_tools tool with the MCP server
@@ -60,19 +66,30 @@ func handleListSavedTools(ctx context.Context, req *mcp.CallToolRequest, args st
 		})
 	}
 
+	// Wrap in object structure
+	response := ToolListResponse{Tools: summaries}
+
 	if len(summaries) == 0 {
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{
 				&mcp.TextContent{Text: "No saved tools found"},
 			},
-		}, summaries, nil
+		}, response, nil
 	}
+
+	// Build a readable list of tools
+	var toolList []string
+	for _, tool := range summaries {
+		toolList = append(toolList, fmt.Sprintf("• %s: %s", tool.Name, tool.Description))
+	}
+
+	listText := fmt.Sprintf("Found %d saved tool(s):\n\n%s", len(summaries), strings.Join(toolList, "\n"))
 
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
-			&mcp.TextContent{Text: fmt.Sprintf("Found %d saved tool(s)", len(summaries))},
+			&mcp.TextContent{Text: listText},
 		},
-	}, summaries, nil
+	}, response, nil
 }
 
 func handleShowSavedTool(ctx context.Context, req *mcp.CallToolRequest, args types.ShowToolArgs) (*mcp.CallToolResult, any, error) {
