@@ -87,6 +87,16 @@ func StarlarkToGoValue(v starlark.Value) (interface{}, error) {
 			result[string(key)] = goVal
 		}
 		return result, nil
+	case starlark.Tuple:
+		result := make([]interface{}, val.Len())
+		for i := 0; i < val.Len(); i++ {
+			item, err := StarlarkToGoValue(val.Index(i))
+			if err != nil {
+				return nil, err
+			}
+			result[i] = item
+		}
+		return result, nil
 	default:
 		return val.String(), nil // Fallback to string representation
 	}
