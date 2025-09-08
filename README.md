@@ -8,6 +8,7 @@ The server now includes:
 - ✅ **Starlark Runtime**: Execute arbitrary Starlark code with parameter passing and flexible result handling
 - ✅ **Tool Composition**: Save and execute custom composite tools written in Starlark
 - ✅ **Dynamic Tool Loading**: Saved tools are automatically loaded and registered at startup
+- ✅ **Input Schema Validation**: Validate saved tool parameters against JSON Schema before execution
 - ✅ **Tool Management API**: List, view, and delete saved tools with dedicated management commands
 - ✅ **File-based Persistence**: Tools stored as JSON files with configurable directory
 - ✅ **Enhanced Type Support**: Full support for Starlark tuples and complex data structures
@@ -163,6 +164,8 @@ greet_user({"name": "Alice"})  // Returns: "Hello, Alice!"
 │   │   ├── save.go         # save_tool tool
 │   │   ├── manage.go       # Tool management API (list/show/delete)
 │   │   └── saved.go        # Dynamic saved tool registration
+│   ├── validation/
+│   │   └── schema.go       # JSON Schema parameter validation
 │   └── types/
 │       └── tool.go         # Type definitions
 └── spec.md                 # Full project specification
@@ -186,8 +189,8 @@ Saved tools are stored as JSON files in `~/.mcp-metatool/tools/` (or `$MCP_METAT
 ## Roadmap
 
 **Next Phase**:
-- Input schema validation for saved tools
 - Enhanced error handling and validation messages
+- Execution timeouts and resource limits
 
 **Future**:
 - MCP server proxying: Connect to upstream MCP servers and expose their tools in Starlark

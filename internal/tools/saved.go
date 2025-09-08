@@ -10,6 +10,7 @@ import (
 	"github.com/dslh/mcp-metatool/internal/persistence"
 	"github.com/dslh/mcp-metatool/internal/starlark"
 	"github.com/dslh/mcp-metatool/internal/types"
+	"github.com/dslh/mcp-metatool/internal/validation"
 )
 
 // RegisterSavedTools loads all saved tools and registers them as MCP tools
@@ -36,6 +37,15 @@ func RegisterSavedTools(server *mcp.Server) error {
 
 // handleSavedTool executes a saved tool by running its Starlark code
 func handleSavedTool(tool *persistence.SavedToolDefinition, args types.SavedToolParams) (*mcp.CallToolResult, any, error) {
+	// Validate parameters against the tool's input schema
+	if err := validation.ValidateParams(tool.InputSchema, map[string]interface{}(args)); err != nil {
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{
+				&mcp.TextContent{Text: validation.FormatValidationError(err)},
+			},
+		}, nil, nil
+	}
+
 	// Execute the tool's Starlark code with the provided arguments
 	result, err := starlark.Execute(tool.Code, args)
 	if err != nil {
