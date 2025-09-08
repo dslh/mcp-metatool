@@ -114,7 +114,7 @@ func handleShowSavedTool(ctx context.Context, req *mcp.CallToolRequest, args typ
 
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
-			&mcp.TextContent{Text: fmt.Sprintf("Tool definition for '%s'", tool.Name)},
+			&mcp.TextContent{Text: tool.Code},
 		},
 	}, tool, nil
 }

@@ -244,10 +244,9 @@ func TestHandleShowSavedTool(t *testing.T) {
 			}
 
 			if tt.wantSuccess {
-				// Should contain success message
-				expectedMsg := "Tool definition for '" + tt.args.Name + "'"
-				if !strings.Contains(textContent.Text, expectedMsg) {
-					t.Errorf("handleShowSavedTool() expected success message containing '%s', got: %s", expectedMsg, textContent.Text)
+				// Should return the tool's Starlark code
+				if textContent.Text != testToolCode {
+					t.Errorf("handleShowSavedTool() expected Starlark code '%s', got: %s", testToolCode, textContent.Text)
 					return
 				}
 
