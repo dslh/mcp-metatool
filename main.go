@@ -38,8 +38,10 @@ func main() {
 		} else {
 			log.Printf("Proxy manager started with %d servers", len(proxyManager.GetConnectedServers()))
 			
-			// TODO: Register proxied tools in Starlark environment
-			// This will be implemented in Phase 2
+			// Register proxied tools with the MCP server
+			if err := tools.RegisterProxiedTools(server, proxyManager, cfg); err != nil {
+				log.Printf("Warning: failed to register proxied tools: %v", err)
+			}
 		}
 	}
 

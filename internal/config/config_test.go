@@ -208,6 +208,15 @@ func TestConfigValidate(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "valid config with hidden server",
+			config: Config{
+				MCPServers: map[string]MCPServerConfig{
+					"test": {Command: "test-command", Hidden: true},
+				},
+			},
+			wantErr: false,
+		},
+		{
 			name: "no servers",
 			config: Config{
 				MCPServers: map[string]MCPServerConfig{},
@@ -241,5 +250,99 @@ func TestConfigValidate(t *testing.T) {
 				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestShouldHideProxiedTools(t *testing.T) {
+	tests := []struct {
+		name     string
+		envValue string
+		expected bool
+	}{
+		{
+			name:     "environment variable not set",
+			envValue: "",
+			expected: false,
+		},
+		{
+			name:     "environment variable set to true",
+			envValue: "true",
+			expected: true,
+		},
+		{
+			name:     "environment variable set to false",
+			envValue: "false",
+			expected: true, // Any non-empty value should hide tools
+		},
+		{
+			name:     "environment variable set to 1",
+			envValue: "1",
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Clean up env var first
+			os.Unsetenv("MCP_METATOOL_HIDE_PROXIED_TOOLS")
+			
+			// Set env var if needed
+			if tt.envValue != "" {
+				os.Setenv("MCP_METATOOL_HIDE_PROXIED_TOOLS", tt.envValue)
+				defer os.Unsetenv("MCP_METATOOL_HIDE_PROXIED_TOOLS")
+			}
+
+			result := ShouldHideProxiedTools()
+			if result != tt.expected {
+				t.Errorf("ShouldHideProxiedTools() = %v, expected %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestLoadConfigWithHiddenField(t *testing.T) {
+	configContent := `{
+  "mcpServers": {
+    "visible": {
+      "command": "test-visible",
+      "args": []
+    },
+    "hidden": {
+      "command": "test-hidden",
+      "args": [],
+      "hidden": true
+    }
+  }
+}`
+
+	// Create temporary file
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "test.json")
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("Failed to write test config: %v", err)
+	}
+
+	// Load config
+	config, err := LoadConfig(configPath)
+	if err != nil {
+		t.Fatalf("LoadConfig failed: %v", err)
+	}
+
+	// Check visible server
+	visible, ok := config.MCPServers["visible"]
+	if !ok {
+		t.Fatal("Visible server not found")
+	}
+	if visible.Hidden {
+		t.Error("Visible server should not be hidden")
+	}
+
+	// Check hidden server
+	hidden, ok := config.MCPServers["hidden"]
+	if !ok {
+		t.Fatal("Hidden server not found")
+	}
+	if !hidden.Hidden {
+		t.Error("Hidden server should be hidden")
 	}
 }

@@ -14,6 +14,7 @@ type MCPServerConfig struct {
 	Command string            `json:"command"`
 	Args    []string          `json:"args,omitempty"`
 	Env     map[string]string `json:"env,omitempty"`
+	Hidden  bool              `json:"hidden,omitempty"`
 }
 
 // Config represents the full metatool configuration
@@ -128,6 +129,11 @@ func expandString(s string) (string, error) {
 		
 		return value
 	}), nil
+}
+
+// ShouldHideProxiedTools returns true if proxied tools should be hidden globally
+func ShouldHideProxiedTools() bool {
+	return os.Getenv("MCP_METATOOL_HIDE_PROXIED_TOOLS") != ""
 }
 
 // Validate checks the configuration for basic validity
