@@ -7,6 +7,7 @@ A Model Context Protocol (MCP) server implementation in Go that enables tool com
 The server now includes:
 - ✅ **Starlark Runtime**: Execute arbitrary Starlark code with parameter passing and flexible result handling
 - ✅ **Tool Composition**: Save and execute custom composite tools written in Starlark
+- ✅ **MCP Server Proxying**: Connect to upstream MCP servers and proxy their tools (Phase 1 complete)
 - ✅ **Dynamic Tool Loading**: Saved tools are automatically loaded and registered at startup
 - ✅ **Input Schema Validation**: Validate saved tool parameters against JSON Schema before execution
 - ✅ **Tool Management API**: List, view, and delete saved tools with dedicated management commands
@@ -38,6 +39,70 @@ The server communicates over stdio using the MCP protocol. Add it to your Claude
 ### Environment Variables
 
 - `MCP_METATOOL_DIR`: Override the default storage directory (`~/.mcp-metatool`)
+
+## MCP Server Proxying
+
+The metatool can connect to upstream MCP servers and proxy their tools, making them available in Starlark scripts. This enables creating composite tools that combine functionality from multiple MCP servers.
+
+### Configuration
+
+Create a `servers.json` file in your metatool directory (`~/.mcp-metatool/servers.json` or `$MCP_METATOOL_DIR/servers.json`):
+
+**Basic Example:**
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "mcp-server-github",
+      "args": ["--token", "${GITHUB_TOKEN}"]
+    },
+    "slack": {
+      "command": "mcp-server-slack",
+      "args": []
+    }
+  }
+}
+```
+
+**Advanced Example with Environment Variables:**
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "mcp-server-github", 
+      "args": ["--token", "${GITHUB_TOKEN}", "--org", "${GITHUB_ORG}"],
+      "env": {
+        "DEBUG": "true",
+        "RATE_LIMIT": "5000"
+      }
+    },
+    "database": {
+      "command": "/usr/local/bin/mcp-server-postgres",
+      "args": ["--connection", "${DATABASE_URL}"],
+      "env": {
+        "POSTGRES_SSL": "require"
+      }
+    },
+    "filesystem": {
+      "command": "mcp-server-filesystem",
+      "args": ["--allowed-dir", "${HOME}/projects"]
+    }
+  }
+}
+```
+
+### Features
+
+- **Environment Variable Expansion**: Use `${VAR}` syntax to reference environment variables in commands, args, and env values
+- **Automatic Discovery**: Tools from connected servers are automatically discovered at startup
+- **Error Resilience**: Failed server connections don't prevent the metatool from starting
+- **Clean Shutdown**: Proper cleanup of all upstream connections on exit
+
+### Status
+
+- ✅ **Phase 1 Complete**: Configuration, connection management, and tool discovery
+- 🚧 **Phase 2 In Progress**: Starlark integration to call upstream tools as `serverName.toolName(params)`
+- 📋 **Phase 3 Planned**: Advanced features like execution timeouts, audit trails, and error handling
 
 ## Available Tools
 
@@ -154,8 +219,14 @@ greet_user({"name": "Alice"})  // Returns: "Hello, Alice!"
 ```
 ├── main.go                 # Server setup and initialization
 ├── internal/
+│   ├── config/
+│   │   ├── config.go       # MCP server configuration parsing
+│   │   └── config_test.go  # Configuration tests
 │   ├── persistence/
 │   │   └── storage.go      # File-based tool persistence
+│   ├── proxy/
+│   │   ├── manager.go      # MCP client connection management
+│   │   └── manager_test.go # Proxy manager tests
 │   ├── starlark/
 │   │   ├── executor.go     # Starlark execution engine
 │   │   └── convert.go      # Go<->Starlark value conversion
@@ -184,15 +255,32 @@ go test ./...
 
 ## Storage
 
-Saved tools are stored as JSON files in `~/.mcp-metatool/tools/` (or `$MCP_METATOOL_DIR/tools/`). Each tool is saved as `{toolname}.json` with the complete tool definition including metadata.
+### Directory Structure
+
+The metatool uses a single directory for all persistent data:
+
+```
+~/.mcp-metatool/              # Default directory (or $MCP_METATOOL_DIR)
+├── servers.json              # MCP server configuration
+└── tools/                    # Saved tool definitions
+    ├── greet_user.json      # Individual tool files
+    ├── data_processor.json
+    └── ...
+```
+
+- **Saved tools**: Stored as JSON files in `tools/` subdirectory
+- **Server config**: Single `servers.json` file for MCP server connections
+- **Environment override**: Use `MCP_METATOOL_DIR` to customize location
 
 ## Roadmap
 
-**Next Phase**:
-- Enhanced error handling and validation messages
-- Execution timeouts and resource limits
+**Phase 2 - Starlark Integration** (Next):
+- Inject proxied tools as callable functions in Starlark: `serverName.toolName(params)`
+- Enhanced composite tool examples combining multiple MCP servers
+- Audit trail and execution context for tool calls
 
-**Future**:
-- MCP server proxying: Connect to upstream MCP servers and expose their tools in Starlark
-- Advanced tool composition patterns and examples
+**Phase 3 - Production Features**:
+- Execution timeouts and resource limits for composite tools
+- Enhanced error handling and validation messages
+- Performance optimizations and metrics
 - Tool versioning and migration support
