@@ -48,6 +48,7 @@ func RegisterProxiedTools(server *mcp.Server, proxyManager ProxyManager, cfg *co
 			mcp.AddTool(server, &mcp.Tool{
 				Name:        prefixedName,
 				Description: fmt.Sprintf("[%s] %s", serverName, tool.Description),
+				InputSchema: tool.InputSchema,
 			}, func(ctx context.Context, req *mcp.CallToolRequest, args ProxiedToolArgs) (*mcp.CallToolResult, any, error) {
 				return handleProxiedTool(proxyManager, capturedServerName, capturedToolName, args)
 			})
