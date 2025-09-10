@@ -101,7 +101,8 @@ Create a `servers.json` file in your metatool directory (`~/.mcp-metatool/server
 ### Status
 
 - ✅ **Phase 1 Complete**: Configuration, connection management, and tool discovery
-- 🚧 **Phase 2 In Progress**: Starlark integration to call upstream tools as `serverName.toolName(params)`
+- ✅ **Phase 2 Complete**: Basic proxied tool functionality with `serverName__toolName` naming
+- 🚧 **Phase 2+ In Progress**: Starlark integration to call upstream tools as `serverName.toolName(params)`
 - 📋 **Phase 3 Planned**: Advanced features like execution timeouts, audit trails, and error handling
 
 ## Available Tools
@@ -234,6 +235,8 @@ greet_user({"name": "Alice"})  // Returns: "Hello, Alice!"
 │   │   ├── eval.go         # eval_starlark tool
 │   │   ├── save.go         # save_tool tool
 │   │   ├── manage.go       # Tool management API (list/show/delete)
+│   │   ├── proxied.go      # Proxied tool registration and handling
+│   │   ├── proxied_test.go # Proxied tool tests
 │   │   └── saved.go        # Dynamic saved tool registration
 │   ├── validation/
 │   │   └── schema.go       # JSON Schema parameter validation
