@@ -3,6 +3,8 @@ package starlark
 import (
 	"strings"
 	"testing"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 func TestExecute_SimpleExpressions(t *testing.T) {
@@ -1125,5 +1127,164 @@ result = {
 
 	if !equalValues(result.Result, expected) {
 		t.Errorf("Execute() result = %v, want %v", result.Result, expected)
+	}
+}
+
+func TestExecuteWithProxy(t *testing.T) {
+	// Test without proxy manager (should work like normal Execute)
+	result, err := ExecuteWithProxy("2 + 3", nil, nil)
+	if err != nil {
+		t.Errorf("Execute without proxy failed: %v", err)
+	}
+	if result.Error != "" {
+		t.Errorf("Unexpected error: %s", result.Error)
+	}
+	if result.Result != int64(5) {
+		t.Errorf("Expected 5, got %v", result.Result)
+	}
+
+	// Test with proxy manager
+	mockProxy := NewMockProxyManager()
+	mockProxy.AddServer("echo", []*mcp.Tool{
+		{Name: "test", Description: "Test tool"},
+	})
+
+	// Test that server namespace is available
+	code := `
+result = echo
+result
+`
+	result, err = ExecuteWithProxy(code, nil, mockProxy)
+	if err != nil {
+		t.Errorf("Execute with proxy failed: %v", err)
+	}
+	if result.Error != "" {
+		t.Errorf("Unexpected error: %s", result.Error)
+	}
+
+	// The result should be the server namespace object
+	if result.Result == nil {
+		t.Error("Expected result to contain server namespace")
+	}
+}
+
+func TestExecuteWithProxyAndParams(t *testing.T) {
+	mockProxy := NewMockProxyManager()
+	mockProxy.AddServer("test", []*mcp.Tool{
+		{Name: "greet", Description: "Greeting tool"},
+	})
+
+	params := map[string]interface{}{
+		"name": "Alice",
+		"count": 3,
+	}
+
+	code := `
+# Test that both params and server namespace are available
+name = params["name"]
+result = {
+    "greeting": name + " says hello",
+    "server_available": test != None
+}
+result
+`
+
+	result, err := ExecuteWithProxy(code, params, mockProxy)
+	if err != nil {
+		t.Errorf("Execute with proxy and params failed: %v", err)
+	}
+	if result.Error != "" {
+		t.Errorf("Unexpected error: %s", result.Error)
+	}
+
+	// Check the result structure
+	resultMap, ok := result.Result.(map[string]interface{})
+	if !ok {
+		t.Errorf("Expected result to be a map, got %T", result.Result)
+	}
+
+	if resultMap["greeting"] != "Alice says hello" {
+		t.Errorf("Expected greeting='Alice says hello', got %v", resultMap["greeting"])
+	}
+
+	if resultMap["server_available"] != true {
+		t.Errorf("Expected server_available=true, got %v", resultMap["server_available"])
+	}
+}
+
+func TestExecuteWithProxyToolCall(t *testing.T) {
+	mockProxy := NewMockProxyManager()
+	mockProxy.AddServer("echo", []*mcp.Tool{
+		{Name: "echo", Description: "Echo tool"},
+	})
+
+	code := `
+result = echo.echo({"message": "test"})
+result
+`
+
+	result, err := ExecuteWithProxy(code, nil, mockProxy)
+	if err != nil {
+		t.Errorf("Execute with proxy tool call failed: %v", err)
+	}
+	if result.Error != "" {
+		t.Errorf("Unexpected error: %s", result.Error)
+	}
+
+	// Verify that the tool was called
+	if len(mockProxy.calls) != 1 {
+		t.Errorf("Expected 1 tool call, got %d", len(mockProxy.calls))
+	}
+
+	call := mockProxy.calls[0]
+	if call.ServerName != "echo" || call.ToolName != "echo" {
+		t.Errorf("Unexpected call: %+v", call)
+	}
+	if call.Arguments["message"] != "test" {
+		t.Errorf("Expected message='test', got %v", call.Arguments["message"])
+	}
+
+	// Check that result contains tool response
+	resultMap, ok := result.Result.(map[string]interface{})
+	if !ok {
+		t.Errorf("Expected result to be a map, got %T", result.Result)
+	}
+
+	if _, hasContent := resultMap["content"]; !hasContent {
+		t.Error("Expected result to have 'content' key")
+	}
+	if _, hasStructured := resultMap["structured"]; !hasStructured {
+		t.Error("Expected result to have 'structured' key")
+	}
+}
+
+func TestExecuteBackwardCompatibility(t *testing.T) {
+	// Test that the original Execute function still works
+	result, err := Execute("10 * 4", nil)
+	if err != nil {
+		t.Errorf("Execute failed: %v", err)
+	}
+	if result.Error != "" {
+		t.Errorf("Unexpected error: %s", result.Error)
+	}
+	if result.Result != int64(40) {
+		t.Errorf("Expected 40, got %v", result.Result)
+	}
+
+	// Test with parameters
+	params := map[string]interface{}{
+		"x": 5,
+		"y": 7,
+	}
+
+	result, err = Execute("params['x'] + params['y']", params)
+	if err != nil {
+		t.Errorf("Execute with params failed: %v", err)
+	}
+	if result.Error != "" {
+		t.Errorf("Unexpected error: %s", result.Error)
+	}
+	if result.Result != int64(12) {
+		t.Errorf("Expected 12, got %v", result.Result)
 	}
 }
