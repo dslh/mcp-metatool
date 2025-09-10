@@ -185,6 +185,77 @@ func TestHandleProxiedTool(t *testing.T) {
 	}
 }
 
+func TestHandleProxiedToolWithStructuredContent(t *testing.T) {
+	// Test that structured content is properly extracted and no circular reference occurs
+	mockProxy := NewMockProxyManager()
+	
+	// Create a result with both content and structured content
+	structuredData := map[string]interface{}{
+		"result":       "Hello from test!",
+		"command_args": []string{"test", "arg1", "arg2"},
+		"timestamp":    "2025-09-10T23:30:00Z",
+	}
+	
+	expectedResult := &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{Text: "Regular content response"},
+		},
+		StructuredContent: structuredData,
+		IsError:          false,
+	}
+	mockProxy.SetMockResult("echo", "echo", expectedResult)
+
+	// Test the handler
+	args := ProxiedToolArgs{
+		"message": "Hello from test!",
+	}
+
+	result, structuredContent, err := handleProxiedTool(mockProxy, "echo", "echo", args)
+	if err != nil {
+		t.Fatalf("handleProxiedTool failed: %v", err)
+	}
+
+	// Verify the result is not nil
+	if result == nil {
+		t.Fatal("Expected result, got nil")
+	}
+
+	// Verify content is preserved
+	if len(result.Content) != 1 {
+		t.Fatalf("Expected 1 content item, got %d", len(result.Content))
+	}
+
+	textContent, ok := result.Content[0].(*mcp.TextContent)
+	if !ok {
+		t.Fatal("Expected TextContent")
+	}
+
+	if textContent.Text != "Regular content response" {
+		t.Errorf("Expected 'Regular content response', got '%s'", textContent.Text)
+	}
+
+	// Verify structured content is extracted correctly
+	if structuredContent == nil {
+		t.Fatal("Expected structured content, got nil")
+	}
+
+	// Verify structured content is the same as what we set
+	structuredMap, ok := structuredContent.(map[string]interface{})
+	if !ok {
+		t.Fatalf("Expected structured content to be map[string]interface{}, got %T", structuredContent)
+	}
+
+	if structuredMap["result"] != "Hello from test!" {
+		t.Errorf("Expected result 'Hello from test!', got '%v'", structuredMap["result"])
+	}
+
+	// Most importantly: verify that structured content is NOT the same object as result
+	// This prevents the circular reference bug
+	if structuredContent == result {
+		t.Fatal("Structured content should not be the same object as result - this would cause circular reference!")
+	}
+}
+
 func TestRegisterProxiedToolsWithMissingServerInConfig(t *testing.T) {
 	// Test behavior when proxy manager has tools from a server not in config
 	config := &config.Config{

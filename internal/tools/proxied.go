@@ -75,5 +75,5 @@ func handleProxiedTool(proxyManager ProxyManager, serverName, toolName string, a
 	}
 
 	// Return the result from the upstream server
-	return result, result, nil
+	return result, result.StructuredContent, nil
 }
