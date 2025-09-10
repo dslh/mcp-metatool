@@ -50,8 +50,12 @@ func main() {
 		defer proxyManager.Stop()
 	}
 
-	// Register built-in tools
-	tools.RegisterEvalStarlark(server)
+	// Register built-in tools (with proxy support if available)
+	if proxyManager != nil {
+		tools.RegisterEvalStarlarkWithProxy(server, proxyManager)
+	} else {
+		tools.RegisterEvalStarlark(server)
+	}
 	tools.RegisterSaveTool(server)
 	
 	// Register tool management tools
@@ -59,9 +63,15 @@ func main() {
 	tools.RegisterShowSavedTool(server)
 	tools.RegisterDeleteSavedTool(server)
 
-	// Load and register saved tools
-	if err := tools.RegisterSavedTools(server); err != nil {
-		log.Printf("Warning: failed to load saved tools: %v", err)
+	// Load and register saved tools (with proxy support if available)
+	if proxyManager != nil {
+		if err := tools.RegisterSavedToolsWithProxy(server, proxyManager); err != nil {
+			log.Printf("Warning: failed to load saved tools: %v", err)
+		}
+	} else {
+		if err := tools.RegisterSavedTools(server); err != nil {
+			log.Printf("Warning: failed to load saved tools: %v", err)
+		}
 	}
 
 	log.Printf("Starting MCP metatool server...")

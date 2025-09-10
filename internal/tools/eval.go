@@ -17,14 +17,31 @@ type EvalStarlarkArgs struct {
 
 // RegisterEvalStarlark registers the eval_starlark tool with the MCP server
 func RegisterEvalStarlark(server *mcp.Server) {
+	RegisterEvalStarlarkWithProxy(server, nil)
+}
+
+// RegisterEvalStarlarkWithProxy registers the eval_starlark tool with proxy support
+func RegisterEvalStarlarkWithProxy(server *mcp.Server, proxyManager ProxyManager) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "eval_starlark",
 		Description: "Execute Starlark code and return the result",
-	}, handleEvalStarlark)
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args EvalStarlarkArgs) (*mcp.CallToolResult, any, error) {
+		return handleEvalStarlarkWithProxy(ctx, req, args, proxyManager)
+	})
 }
 
 func handleEvalStarlark(ctx context.Context, req *mcp.CallToolRequest, args EvalStarlarkArgs) (*mcp.CallToolResult, any, error) {
-	result, err := starlark.Execute(args.Code, args.Params)
+	return handleEvalStarlarkWithProxy(ctx, req, args, nil)
+}
+
+func handleEvalStarlarkWithProxy(ctx context.Context, req *mcp.CallToolRequest, args EvalStarlarkArgs, proxyManager ProxyManager) (*mcp.CallToolResult, any, error) {
+	// Cast proxyManager to starlark.ProxyManager interface
+	var starlarkProxy starlark.ProxyManager
+	if proxyManager != nil {
+		starlarkProxy = proxyManager
+	}
+	
+	result, err := starlark.ExecuteWithProxy(args.Code, args.Params, starlarkProxy)
 	if err != nil {
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{

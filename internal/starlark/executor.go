@@ -17,6 +17,11 @@ type Result struct {
 
 // Execute runs Starlark code with optional parameters and returns the result
 func Execute(code string, params map[string]interface{}) (*Result, error) {
+	return ExecuteWithProxy(code, params, nil)
+}
+
+// ExecuteWithProxy runs Starlark code with optional parameters and proxy manager access
+func ExecuteWithProxy(code string, params map[string]interface{}, proxyManager ProxyManager) (*Result, error) {
 	thread := &starlark.Thread{Name: "eval_starlark"}
 	
 	// Set up predeclared identifiers (built-ins + params)
@@ -36,6 +41,14 @@ func Execute(code string, params map[string]interface{}) (*Result, error) {
 			paramsDict.SetKey(starlark.String(k), val)
 		}
 		predeclared["params"] = paramsDict
+	}
+
+	// Add server namespaces if proxy manager is available
+	if proxyManager != nil {
+		serverNamespaces := CreateServerNamespaces(proxyManager)
+		for name, namespace := range serverNamespaces {
+			predeclared[name] = namespace
+		}
 	}
 
 	// Execute the Starlark code
