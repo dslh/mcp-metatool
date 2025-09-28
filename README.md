@@ -114,10 +114,50 @@ Create a `servers.json` file in your metatool directory (`~/.mcp-metatool/server
 }
 ```
 
+### Tool Filtering
+
+Control which tools are exposed to agents while keeping all tools available for Starlark composition:
+
+**Allowlist Mode (only specified tools exposed):**
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "mcp-server-github",
+      "allowedTools": ["get_issue", "list_issues", "create_*"]
+    }
+  }
+}
+```
+
+**Denylist Mode (specified tools hidden):**
+```json
+{
+  "mcpServers": {
+    "slack": {
+      "command": "mcp-server-slack",
+      "hiddenTools": ["admin_*", "delete_*", "dangerous_operation"]
+    }
+  }
+}
+```
+
+**Wildcard Patterns:**
+- `admin_*` matches `admin_user`, `admin_delete`, etc.
+- `*_admin` matches `delete_admin`, `user_admin`, etc.
+- `get_*_info` matches `get_user_info`, `get_repo_info`, etc.
+- `*` matches any tool name
+
+**Important Notes:**
+- Use either `allowedTools` OR `hiddenTools`, not both
+- Filtered tools remain available in Starlark scripts for composition
+- Perfect for wrapping raw tools with processed versions
+
 ### Features
 
 - **Environment Variable Expansion**: Use `${VAR}` syntax to reference environment variables in commands, args, and env values
 - **Automatic Discovery**: Tools from connected servers are automatically discovered at startup
+- **Per-Tool Filtering**: Fine-grained control over which tools are exposed to agents
 - **Error Resilience**: Failed server connections don't prevent the metatool from starting
 - **Clean Shutdown**: Proper cleanup of all upstream connections on exit
 

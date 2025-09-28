@@ -82,13 +82,26 @@ func RegisterProxiedTools(server *mcp.Server, proxyManager ProxyManager, cfg *co
 	totalRegistered := 0
 
 	for serverName, tools := range allTools {
+		// Get server configuration
+		serverConfig, exists := cfg.MCPServers[serverName]
+		if !exists {
+			log.Printf("Warning: No configuration found for server %s, skipping tools", serverName)
+			continue
+		}
+
 		// Check if this specific server should be hidden
-		if serverConfig, exists := cfg.MCPServers[serverName]; exists && serverConfig.Hidden {
+		if serverConfig.Hidden {
 			log.Printf("Skipping tools from hidden server: %s", serverName)
 			continue
 		}
 
 		for _, tool := range tools {
+			// Check if this tool should be included based on server configuration
+			if !serverConfig.ShouldIncludeTool(tool.Name) {
+				log.Printf("Filtered out tool: %s.%s", serverName, tool.Name)
+				continue
+			}
+
 			// Create a prefixed tool name to avoid conflicts
 			prefixedName := fmt.Sprintf("%s__%s", serverName, tool.Name)
 

@@ -11,10 +11,12 @@ import (
 
 // MCPServerConfig represents a single MCP server configuration
 type MCPServerConfig struct {
-	Command string            `json:"command"`
-	Args    []string          `json:"args,omitempty"`
-	Env     map[string]string `json:"env,omitempty"`
-	Hidden  bool              `json:"hidden,omitempty"`
+	Command      string            `json:"command"`
+	Args         []string          `json:"args,omitempty"`
+	Env          map[string]string `json:"env,omitempty"`
+	Hidden       bool              `json:"hidden,omitempty"`
+	AllowedTools []string          `json:"allowedTools,omitempty"`
+	HiddenTools  []string          `json:"hiddenTools,omitempty"`
 }
 
 // Config represents the full metatool configuration
@@ -146,7 +148,57 @@ func (c *Config) Validate() error {
 		if strings.TrimSpace(serverConfig.Command) == "" {
 			return fmt.Errorf("server %s has empty command", serverName)
 		}
+
+		// Validate tool filtering configuration
+		if len(serverConfig.AllowedTools) > 0 && len(serverConfig.HiddenTools) > 0 {
+			return fmt.Errorf("server %s cannot have both allowedTools and hiddenTools configured", serverName)
+		}
 	}
 
 	return nil
+}
+
+// MatchesPattern checks if a tool name matches a pattern with wildcard support
+func MatchesPattern(toolName, pattern string) bool {
+	// If no wildcards, do exact match
+	if !strings.Contains(pattern, "*") {
+		return toolName == pattern
+	}
+
+	// Convert glob pattern to regex
+	regexPattern := strings.ReplaceAll(regexp.QuoteMeta(pattern), `\*`, `.*`)
+	regexPattern = "^" + regexPattern + "$"
+
+	matched, err := regexp.MatchString(regexPattern, toolName)
+	if err != nil {
+		// If regex fails, fall back to exact match
+		return toolName == pattern
+	}
+
+	return matched
+}
+
+// ShouldIncludeTool determines if a tool should be included based on server configuration
+func (cfg MCPServerConfig) ShouldIncludeTool(toolName string) bool {
+	// Check allowlist first (if configured, only these tools are included)
+	if len(cfg.AllowedTools) > 0 {
+		for _, allowedPattern := range cfg.AllowedTools {
+			if MatchesPattern(toolName, allowedPattern) {
+				return true
+			}
+		}
+		return false // Not in allowlist
+	}
+
+	// Check denylist (if configured, these tools are excluded)
+	if len(cfg.HiddenTools) > 0 {
+		for _, hiddenPattern := range cfg.HiddenTools {
+			if MatchesPattern(toolName, hiddenPattern) {
+				return false
+			}
+		}
+	}
+
+	// No filtering configured or not in denylist - include the tool
+	return true
 }

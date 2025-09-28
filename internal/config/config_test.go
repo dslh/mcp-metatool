@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -344,5 +345,333 @@ func TestLoadConfigWithHiddenField(t *testing.T) {
 	}
 	if !hidden.Hidden {
 		t.Error("Hidden server should be hidden")
+	}
+}
+
+func TestMatchesPattern(t *testing.T) {
+	tests := []struct {
+		name     string
+		toolName string
+		pattern  string
+		expected bool
+	}{
+		{
+			name:     "exact match",
+			toolName: "get_issue",
+			pattern:  "get_issue",
+			expected: true,
+		},
+		{
+			name:     "exact no match",
+			toolName: "get_issue",
+			pattern:  "create_issue",
+			expected: false,
+		},
+		{
+			name:     "wildcard prefix match",
+			toolName: "admin_delete_user",
+			pattern:  "admin_*",
+			expected: true,
+		},
+		{
+			name:     "wildcard suffix match",
+			toolName: "delete_admin",
+			pattern:  "*_admin",
+			expected: true,
+		},
+		{
+			name:     "wildcard middle match",
+			toolName: "get_user_info",
+			pattern:  "get_*_info",
+			expected: true,
+		},
+		{
+			name:     "wildcard no match",
+			toolName: "get_issue",
+			pattern:  "admin_*",
+			expected: false,
+		},
+		{
+			name:     "wildcard full match",
+			toolName: "anything",
+			pattern:  "*",
+			expected: true,
+		},
+		{
+			name:     "multiple wildcards",
+			toolName: "github_get_user_data",
+			pattern:  "*_get_*",
+			expected: true,
+		},
+		{
+			name:     "empty pattern",
+			toolName: "get_issue",
+			pattern:  "",
+			expected: false,
+		},
+		{
+			name:     "empty tool name with wildcard",
+			toolName: "",
+			pattern:  "*",
+			expected: true,
+		},
+		{
+			name:     "special regex chars in pattern",
+			toolName: "get.issue",
+			pattern:  "get.issue",
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := MatchesPattern(tt.toolName, tt.pattern)
+			if result != tt.expected {
+				t.Errorf("MatchesPattern(%q, %q) = %v, expected %v", tt.toolName, tt.pattern, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestMCPServerConfig_ShouldIncludeTool(t *testing.T) {
+	tests := []struct {
+		name     string
+		config   MCPServerConfig
+		toolName string
+		expected bool
+	}{
+		{
+			name:     "no filtering - should include",
+			config:   MCPServerConfig{Command: "test"},
+			toolName: "any_tool",
+			expected: true,
+		},
+		{
+			name: "allowlist - tool included",
+			config: MCPServerConfig{
+				Command:      "test",
+				AllowedTools: []string{"get_issue", "create_issue"},
+			},
+			toolName: "get_issue",
+			expected: true,
+		},
+		{
+			name: "allowlist - tool not included",
+			config: MCPServerConfig{
+				Command:      "test",
+				AllowedTools: []string{"get_issue", "create_issue"},
+			},
+			toolName: "delete_issue",
+			expected: false,
+		},
+		{
+			name: "allowlist with wildcard - tool matches",
+			config: MCPServerConfig{
+				Command:      "test",
+				AllowedTools: []string{"get_*", "create_*"},
+			},
+			toolName: "get_user",
+			expected: true,
+		},
+		{
+			name: "allowlist with wildcard - tool doesn't match",
+			config: MCPServerConfig{
+				Command:      "test",
+				AllowedTools: []string{"get_*", "create_*"},
+			},
+			toolName: "delete_user",
+			expected: false,
+		},
+		{
+			name: "denylist - tool not in list",
+			config: MCPServerConfig{
+				Command:     "test",
+				HiddenTools: []string{"delete_*", "admin_*"},
+			},
+			toolName: "get_issue",
+			expected: true,
+		},
+		{
+			name: "denylist - tool in list",
+			config: MCPServerConfig{
+				Command:     "test",
+				HiddenTools: []string{"delete_*", "admin_*"},
+			},
+			toolName: "delete_user",
+			expected: false,
+		},
+		{
+			name: "denylist with exact match",
+			config: MCPServerConfig{
+				Command:     "test",
+				HiddenTools: []string{"dangerous_tool"},
+			},
+			toolName: "dangerous_tool",
+			expected: false,
+		},
+		{
+			name: "denylist - tool not matching pattern",
+			config: MCPServerConfig{
+				Command:     "test",
+				HiddenTools: []string{"admin_*"},
+			},
+			toolName: "user_admin",
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.config.ShouldIncludeTool(tt.toolName)
+			if result != tt.expected {
+				t.Errorf("ShouldIncludeTool(%q) = %v, expected %v", tt.toolName, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestConfigValidateWithToolFiltering(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  Config
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name: "valid config with allowlist",
+			config: Config{
+				MCPServers: map[string]MCPServerConfig{
+					"test": {
+						Command:      "test-command",
+						AllowedTools: []string{"get_*", "create_issue"},
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid config with denylist",
+			config: Config{
+				MCPServers: map[string]MCPServerConfig{
+					"test": {
+						Command:     "test-command",
+						HiddenTools: []string{"delete_*", "admin_*"},
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid config with both allowlist and denylist",
+			config: Config{
+				MCPServers: map[string]MCPServerConfig{
+					"test": {
+						Command:      "test-command",
+						AllowedTools: []string{"get_*"},
+						HiddenTools:  []string{"delete_*"},
+					},
+				},
+			},
+			wantErr: true,
+			errMsg:  "cannot have both allowedTools and hiddenTools",
+		},
+		{
+			name: "empty filtering lists are valid",
+			config: Config{
+				MCPServers: map[string]MCPServerConfig{
+					"test": {
+						Command:      "test-command",
+						AllowedTools: []string{},
+						HiddenTools:  []string{},
+					},
+				},
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.config.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr && tt.errMsg != "" && !strings.Contains(err.Error(), tt.errMsg) {
+				t.Errorf("Validate() error = %v, expected to contain %q", err, tt.errMsg)
+			}
+		})
+	}
+}
+
+func TestLoadConfigWithToolFiltering(t *testing.T) {
+	configContent := `{
+  "mcpServers": {
+    "github": {
+      "command": "mcp-server-github",
+      "allowedTools": ["get_issue", "list_issues", "create_*"]
+    },
+    "slack": {
+      "command": "mcp-server-slack",
+      "hiddenTools": ["admin_*", "delete_*"]
+    },
+    "database": {
+      "command": "mcp-server-db"
+    }
+  }
+}`
+
+	// Create temporary file
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "test.json")
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("Failed to write test config: %v", err)
+	}
+
+	// Load config
+	config, err := LoadConfig(configPath)
+	if err != nil {
+		t.Fatalf("LoadConfig failed: %v", err)
+	}
+
+	// Check github server (allowlist)
+	github, ok := config.MCPServers["github"]
+	if !ok {
+		t.Fatal("Github server not found")
+	}
+	expectedAllowed := []string{"get_issue", "list_issues", "create_*"}
+	if len(github.AllowedTools) != len(expectedAllowed) {
+		t.Errorf("Expected %d allowed tools, got %d", len(expectedAllowed), len(github.AllowedTools))
+	}
+	for i, expected := range expectedAllowed {
+		if github.AllowedTools[i] != expected {
+			t.Errorf("Expected allowed tool %q, got %q", expected, github.AllowedTools[i])
+		}
+	}
+
+	// Check slack server (denylist)
+	slack, ok := config.MCPServers["slack"]
+	if !ok {
+		t.Fatal("Slack server not found")
+	}
+	expectedHidden := []string{"admin_*", "delete_*"}
+	if len(slack.HiddenTools) != len(expectedHidden) {
+		t.Errorf("Expected %d hidden tools, got %d", len(expectedHidden), len(slack.HiddenTools))
+	}
+	for i, expected := range expectedHidden {
+		if slack.HiddenTools[i] != expected {
+			t.Errorf("Expected hidden tool %q, got %q", expected, slack.HiddenTools[i])
+		}
+	}
+
+	// Check database server (no filtering)
+	database, ok := config.MCPServers["database"]
+	if !ok {
+		t.Fatal("Database server not found")
+	}
+	if len(database.AllowedTools) != 0 {
+		t.Errorf("Expected no allowed tools, got %d", len(database.AllowedTools))
+	}
+	if len(database.HiddenTools) != 0 {
+		t.Errorf("Expected no hidden tools, got %d", len(database.HiddenTools))
 	}
 }
