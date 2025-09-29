@@ -124,3 +124,42 @@ func TestCallToolNonexistentServer(t *testing.T) {
 		t.Errorf("Expected specific error message, got: %v", err)
 	}
 }
+
+func TestWithQuietMode(t *testing.T) {
+	cfg := &config.Config{
+		MCPServers: map[string]config.MCPServerConfig{
+			"test": {
+				Command: "echo",
+				Args:    []string{"hello"},
+			},
+		},
+	}
+
+	// Test default (verbose mode)
+	manager := NewManager(cfg)
+	if manager.quiet {
+		t.Error("Manager should default to verbose mode (quiet=false)")
+	}
+	manager.Stop()
+
+	// Test with quiet mode enabled
+	managerQuiet := NewManager(cfg, WithQuietMode())
+	if !managerQuiet.quiet {
+		t.Error("Manager should be in quiet mode when WithQuietMode() is used")
+	}
+	managerQuiet.Stop()
+}
+
+func TestMultipleOptions(t *testing.T) {
+	cfg := &config.Config{
+		MCPServers: map[string]config.MCPServerConfig{},
+	}
+
+	// Test that multiple options can be applied
+	// (Currently we only have one option, but this tests the pattern)
+	manager := NewManager(cfg, WithQuietMode())
+	if !manager.quiet {
+		t.Error("Options not applied correctly")
+	}
+	manager.Stop()
+}

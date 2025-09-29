@@ -7,12 +7,19 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/dslh/mcp-metatool/internal/cmd"
 	"github.com/dslh/mcp-metatool/internal/config"
 	"github.com/dslh/mcp-metatool/internal/proxy"
 	"github.com/dslh/mcp-metatool/internal/tools"
 )
 
 func main() {
+	// Check for subcommands
+	if exitCode := cmd.Run(os.Args[1:]); exitCode >= 0 {
+		os.Exit(exitCode)
+	}
+
+	// No subcommand matched, proceed with normal MCP server startup
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "mcp-metatool",
 		Version: "0.1.0",

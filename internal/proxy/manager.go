@@ -21,19 +21,38 @@ type Manager struct {
 	mu        sync.RWMutex
 	ctx       context.Context
 	cancel    context.CancelFunc
+	quiet     bool // suppress logging output
 }
 
-// NewManager creates a new proxy manager
-func NewManager(cfg *config.Config) *Manager {
+// Option is a functional option for configuring Manager
+type Option func(*Manager)
+
+// WithQuietMode configures the manager to suppress logging
+func WithQuietMode() Option {
+	return func(m *Manager) {
+		m.quiet = true
+	}
+}
+
+// NewManager creates a new proxy manager with optional configuration
+func NewManager(cfg *config.Config, opts ...Option) *Manager {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &Manager{
+	m := &Manager{
 		config:   cfg,
 		clients:  make(map[string]*mcp.Client),
 		sessions: make(map[string]*mcp.ClientSession),
 		tools:    make(map[string][]*mcp.Tool),
 		ctx:      ctx,
 		cancel:   cancel,
+		quiet:    false, // default to verbose
 	}
+
+	// Apply options
+	for _, opt := range opts {
+		opt(m)
+	}
+
+	return m
 }
 
 // Start initializes connections to all configured upstream servers
@@ -43,7 +62,9 @@ func (m *Manager) Start() error {
 
 	for serverName, serverConfig := range m.config.MCPServers {
 		if err := m.connectServer(serverName, serverConfig); err != nil {
-			log.Printf("Warning: Failed to connect to server %s: %v", serverName, err)
+			if !m.quiet {
+				log.Printf("Warning: Failed to connect to server %s: %v", serverName, err)
+			}
 			// Continue with other servers instead of failing completely
 			continue
 		}
@@ -63,7 +84,9 @@ func (m *Manager) Stop() {
 	// Close all sessions
 	for serverName, session := range m.sessions {
 		if err := session.Close(); err != nil {
-			log.Printf("Error closing session for server %s: %v", serverName, err)
+			if !m.quiet {
+				log.Printf("Error closing session for server %s: %v", serverName, err)
+			}
 		}
 	}
 
@@ -106,11 +129,15 @@ func (m *Manager) connectServer(serverName string, serverConfig config.MCPServer
 
 	// Discover tools
 	if err := m.discoverTools(serverName, session); err != nil {
-		log.Printf("Warning: Failed to discover tools for server %s: %v", serverName, err)
+		if !m.quiet {
+			log.Printf("Warning: Failed to discover tools for server %s: %v", serverName, err)
+		}
 		// Don't fail the connection for tool discovery issues
 	}
 
-	log.Printf("Successfully connected to MCP server: %s", serverName)
+	if !m.quiet {
+		log.Printf("Successfully connected to MCP server: %s", serverName)
+	}
 	return nil
 }
 
@@ -124,10 +151,12 @@ func (m *Manager) discoverTools(serverName string, session *mcp.ClientSession) e
 
 	// Store the tools
 	m.tools[serverName] = result.Tools
-	
-	log.Printf("Discovered %d tools from server %s", len(result.Tools), serverName)
-	for _, tool := range result.Tools {
-		log.Printf("  - %s: %s", tool.Name, tool.Description)
+
+	if !m.quiet {
+		log.Printf("Discovered %d tools from server %s", len(result.Tools), serverName)
+		for _, tool := range result.Tools {
+			log.Printf("  - %s: %s", tool.Name, tool.Description)
+		}
 	}
 
 	return nil
