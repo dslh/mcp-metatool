@@ -2,6 +2,7 @@ package starlark
 
 import (
 	"fmt"
+	"strings"
 
 	"go.starlark.net/starlark"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -182,29 +183,36 @@ func (t *ToolFunction) CallInternal(thread *starlark.Thread, args starlark.Tuple
 	return resultDict, nil
 }
 
+// normalizeServerName converts server names to valid Starlark identifiers
+// by replacing hyphens with underscores
+func normalizeServerName(name string) string {
+	return strings.ReplaceAll(name, "-", "_")
+}
+
 // CreateServerNamespaces creates Starlark server namespace objects from a ProxyManager
 func CreateServerNamespaces(proxyManager ProxyManager) starlark.StringDict {
 	if proxyManager == nil {
 		return nil
 	}
-	
+
 	allTools := proxyManager.GetAllTools()
 	namespaces := make(starlark.StringDict)
-	
+
 	for serverName, tools := range allTools {
 		toolMap := make(map[string]*mcp.Tool)
 		for _, tool := range tools {
 			toolMap[tool.Name] = tool
 		}
-		
+
 		namespace := &ServerNamespace{
 			serverName:   serverName,
 			proxyManager: proxyManager,
 			tools:        toolMap,
 		}
-		
-		namespaces[serverName] = namespace
+
+		// Use normalized name as Starlark identifier (replace hyphens with underscores)
+		namespaces[normalizeServerName(serverName)] = namespace
 	}
-	
+
 	return namespaces
 }

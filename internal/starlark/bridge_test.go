@@ -239,3 +239,98 @@ func TestToolFunctionCallErrors(t *testing.T) {
 		t.Error("Expected error for too many arguments")
 	}
 }
+
+func TestNormalizeServerName(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"simple", "simple"},
+		{"with-hyphens", "with_hyphens"},
+		{"multiple-hyphens-here", "multiple_hyphens_here"},
+		{"github-gohiring", "github_gohiring"},
+		{"zenhub-graphql", "zenhub_graphql"},
+		{"no_change_needed", "no_change_needed"},
+		{"mixed-and_combined", "mixed_and_combined"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := normalizeServerName(tt.input)
+			if result != tt.expected {
+				t.Errorf("normalizeServerName(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestServerNameNormalizationInNamespaces(t *testing.T) {
+	mockProxy := NewMockProxyManager()
+
+	// Add servers with hyphens in their names
+	mockProxy.AddServer("github-gohiring", []*mcp.Tool{
+		{Name: "get_me", Description: "Get current user"},
+	})
+	mockProxy.AddServer("zenhub-graphql", []*mcp.Tool{
+		{Name: "execute_query", Description: "Execute GraphQL query"},
+	})
+
+	namespaces := CreateServerNamespaces(mockProxy)
+
+	// Check that normalized names exist
+	if _, exists := namespaces["github_gohiring"]; !exists {
+		t.Error("Expected 'github_gohiring' (normalized) to exist in namespaces")
+	}
+	if _, exists := namespaces["zenhub_graphql"]; !exists {
+		t.Error("Expected 'zenhub_graphql' (normalized) to exist in namespaces")
+	}
+
+	// Check that original hyphenated names don't exist
+	if _, exists := namespaces["github-gohiring"]; exists {
+		t.Error("Did not expect 'github-gohiring' (original) to exist in namespaces")
+	}
+
+	// Verify we can access tools through normalized names
+	githubNS := namespaces["github_gohiring"].(*ServerNamespace)
+	_, err := githubNS.Attr("get_me")
+	if err != nil {
+		t.Errorf("Expected to access tool through normalized namespace: %v", err)
+	}
+}
+
+func TestServerNamePreservedInToolCalls(t *testing.T) {
+	mockProxy := NewMockProxyManager()
+
+	// Add server with hyphenated name
+	mockProxy.AddServer("github-gohiring", []*mcp.Tool{
+		{Name: "get_me", Description: "Get current user"},
+	})
+
+	namespaces := CreateServerNamespaces(mockProxy)
+
+	// Access through normalized name
+	githubNS := namespaces["github_gohiring"].(*ServerNamespace)
+	getMeTool, _ := githubNS.Attr("get_me")
+	toolFunc := getMeTool.(*ToolFunction)
+
+	// Call the tool
+	thread := &starlark.Thread{Name: "test"}
+	emptyDict := starlark.NewDict(0)
+	_, err := toolFunc.CallInternal(thread, starlark.Tuple{emptyDict}, nil)
+	if err != nil {
+		t.Errorf("Tool call failed: %v", err)
+	}
+
+	// Verify that the original server name (with hyphen) was used in the call
+	if len(mockProxy.calls) != 1 {
+		t.Fatalf("Expected 1 call, got %d", len(mockProxy.calls))
+	}
+
+	call := mockProxy.calls[0]
+	if call.ServerName != "github-gohiring" {
+		t.Errorf("Expected ServerName='github-gohiring' (original), got %q", call.ServerName)
+	}
+	if call.ToolName != "get_me" {
+		t.Errorf("Expected ToolName='get_me', got %q", call.ToolName)
+	}
+}
