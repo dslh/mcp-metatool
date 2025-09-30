@@ -64,37 +64,10 @@ func ExecuteWithProxy(code string, params map[string]interface{}, proxyManager P
 		LoadBindsGlobally: true, // Load statements bind globally
 	}
 
-	// Try as expression first, then as statements
-	if strings.Contains(code, "\n") || strings.Contains(code, "return") {
-		// Multi-line or contains return - execute as program
-		modGlobals, execErr := starlark.ExecFileOptions(fileOptions, thread, "<eval>", code, predeclared)
-		if execErr != nil {
-			return &Result{Error: fmt.Sprintf("Execution error: %v", execErr)}, nil
-		}
-		// Look for a 'result' variable first, then fallback to all globals
-		if resultVal, ok := modGlobals["result"]; ok {
-			result = resultVal
-		} else {
-			// No explicit result variable - return filtered globals as a dict
-			filteredGlobals := filterUserGlobals(modGlobals, predeclared)
-			if len(filteredGlobals) == 0 {
-				// No user variables - return None
-				result = starlark.None
-			} else {
-				// Convert filtered globals to Starlark dict
-				globalsDict := starlark.NewDict(len(filteredGlobals))
-				for k, v := range filteredGlobals {
-					globalsDict.SetKey(starlark.String(k), v)
-				}
-				result = globalsDict
-			}
-		}
-	} else {
-		// Single expression - evaluate directly
-		result, err = starlark.EvalOptions(fileOptions, thread, "<eval>", code, predeclared)
-		if err != nil {
-			return &Result{Error: fmt.Sprintf("Evaluation error: %v", err)}, nil
-		}
+	// Execute the code and extract result
+	result, err = executeCode(code, fileOptions, thread, predeclared)
+	if err != nil {
+		return &Result{Error: err.Error()}, nil
 	}
 
 	// Convert result back to Go value
@@ -104,6 +77,61 @@ func ExecuteWithProxy(code string, params map[string]interface{}, proxyManager P
 	}
 
 	return &Result{Result: goResult}, nil
+}
+
+// executeCode runs Starlark code and extracts the result
+func executeCode(code string, fileOptions *syntax.FileOptions, thread *starlark.Thread, predeclared starlark.StringDict) (starlark.Value, error) {
+	// Check if code should be executed as a program or expression
+	if isMultiLineCode(code) {
+		return executeAsProgram(code, fileOptions, thread, predeclared)
+	}
+	return executeAsExpression(code, fileOptions, thread, predeclared)
+}
+
+// isMultiLineCode determines if code should be executed as a program
+func isMultiLineCode(code string) bool {
+	return strings.Contains(code, "\n") || strings.Contains(code, "return")
+}
+
+// executeAsProgram executes code as a Starlark program and extracts the result
+func executeAsProgram(code string, fileOptions *syntax.FileOptions, thread *starlark.Thread, predeclared starlark.StringDict) (starlark.Value, error) {
+	modGlobals, err := starlark.ExecFileOptions(fileOptions, thread, "<eval>", code, predeclared)
+	if err != nil {
+		return nil, fmt.Errorf("Execution error: %v", err)
+	}
+
+	// Look for explicit 'result' variable first
+	if resultVal, ok := modGlobals["result"]; ok {
+		return resultVal, nil
+	}
+
+	// No explicit result - return filtered globals
+	return extractResultFromGlobals(modGlobals, predeclared), nil
+}
+
+// executeAsExpression evaluates code as a single expression
+func executeAsExpression(code string, fileOptions *syntax.FileOptions, thread *starlark.Thread, predeclared starlark.StringDict) (starlark.Value, error) {
+	result, err := starlark.EvalOptions(fileOptions, thread, "<eval>", code, predeclared)
+	if err != nil {
+		return nil, fmt.Errorf("Evaluation error: %v", err)
+	}
+	return result, nil
+}
+
+// extractResultFromGlobals filters user-defined globals and returns them as a result
+func extractResultFromGlobals(modGlobals, predeclared starlark.StringDict) starlark.Value {
+	filteredGlobals := filterUserGlobals(modGlobals, predeclared)
+
+	if len(filteredGlobals) == 0 {
+		return starlark.None
+	}
+
+	// Convert filtered globals to Starlark dict
+	globalsDict := starlark.NewDict(len(filteredGlobals))
+	for k, v := range filteredGlobals {
+		globalsDict.SetKey(starlark.String(k), v)
+	}
+	return globalsDict
 }
 
 func filterUserGlobals(modGlobals, predeclared starlark.StringDict) starlark.StringDict {

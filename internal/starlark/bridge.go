@@ -5,14 +5,12 @@ import (
 
 	"go.starlark.net/starlark"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/dslh/mcp-metatool/internal/proxy"
 )
 
-// ProxyManager interface for accessing upstream MCP servers
-// This is a local definition to avoid circular imports with the tools package
-type ProxyManager interface {
-	GetAllTools() map[string][]*mcp.Tool
-	CallTool(serverName, toolName string, arguments map[string]interface{}) (*mcp.CallToolResult, error)
-}
+// ProxyManager is an alias for the canonical interface
+type ProxyManager = proxy.ProxyManager
 
 // ServerNamespace represents a server's tools as a Starlark object
 type ServerNamespace struct {

@@ -8,6 +8,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/dslh/mcp-metatool/internal/config"
+	"github.com/dslh/mcp-metatool/internal/schema"
 )
 
 // MockProxyManager implements a minimal proxy manager for testing
@@ -400,7 +401,7 @@ func TestTransformSchema(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := transformSchema(tt.input)
+			result := schema.Transform(tt.input)
 
 			if tt.expected == nil {
 				if result != nil {
@@ -474,7 +475,7 @@ func TestSafeTransformSchema(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := safeTransformSchema(tt.input, tt.toolName)
+			result := schema.SafeTransform(tt.input, tt.toolName)
 
 			if tt.wantNil && result != nil {
 				t.Errorf("Expected nil result, got %+v", result)
