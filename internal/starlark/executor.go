@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"strings"
 
+	"go.starlark.net/lib/json"
+	"go.starlark.net/lib/math"
+	"go.starlark.net/lib/time"
 	"go.starlark.net/starlark"
 	"go.starlark.net/syntax"
 )
@@ -29,6 +32,11 @@ func ExecuteWithProxy(code string, params map[string]interface{}, proxyManager P
 	for name, value := range starlark.Universe {
 		predeclared[name] = value
 	}
+
+	// Add standard library modules
+	predeclared["time"] = time.Module
+	predeclared["math"] = math.Module
+	predeclared["json"] = json.Module
 
 	// Convert params to Starlark values if provided
 	if params != nil {

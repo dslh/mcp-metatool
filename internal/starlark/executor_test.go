@@ -1288,3 +1288,470 @@ func TestExecuteBackwardCompatibility(t *testing.T) {
 		t.Errorf("Expected 12, got %v", result.Result)
 	}
 }
+
+func TestExecute_TimeModule(t *testing.T) {
+	tests := []struct {
+		name    string
+		code    string
+		params  map[string]interface{}
+		wantErr bool
+		check   func(t *testing.T, result interface{})
+	}{
+		{
+			name:    "time.now returns a time",
+			code:    "time.now()",
+			wantErr: false,
+			check: func(t *testing.T, result interface{}) {
+				if result == nil {
+					t.Error("time.now() should return a value")
+				}
+			},
+		},
+		{
+			name:    "time.parse_time parses ISO 8601",
+			code:    `time.parse_time("2025-01-15T10:30:00Z")`,
+			wantErr: false,
+			check: func(t *testing.T, result interface{}) {
+				if result == nil {
+					t.Error("time.parse_time() should return a time value")
+				}
+			},
+		},
+		{
+			name:    "time.parse_time with format",
+			code:    `time.parse_time("2025-01-15", "2006-01-02")`,
+			wantErr: false,
+			check: func(t *testing.T, result interface{}) {
+				if result == nil {
+					t.Error("time.parse_time() with format should return a time value")
+				}
+			},
+		},
+		{
+			name:    "time.time creates time",
+			code:    `time.time(year=2025, month=1, day=15, hour=10, minute=30, second=0)`,
+			wantErr: false,
+			check: func(t *testing.T, result interface{}) {
+				if result == nil {
+					t.Error("time.time() should return a time value")
+				}
+			},
+		},
+		{
+			name:    "time constants",
+			code:    `{"hour": time.hour, "minute": time.minute, "second": time.second}`,
+			wantErr: false,
+			check: func(t *testing.T, result interface{}) {
+				resultMap, ok := result.(map[string]interface{})
+				if !ok {
+					t.Errorf("Expected map, got %T", result)
+					return
+				}
+				if resultMap["hour"] == nil || resultMap["minute"] == nil || resultMap["second"] == nil {
+					t.Error("Time constants should be defined")
+				}
+			},
+		},
+		{
+			name:    "time.parse_duration",
+			code:    `time.parse_duration("1h30m")`,
+			wantErr: false,
+			check: func(t *testing.T, result interface{}) {
+				if result == nil {
+					t.Error("time.parse_duration() should return a duration")
+				}
+			},
+		},
+		{
+			name:    "time.is_valid_timezone",
+			code:    `{"utc": time.is_valid_timezone("UTC"), "invalid": time.is_valid_timezone("NotATimezone")}`,
+			wantErr: false,
+			check: func(t *testing.T, result interface{}) {
+				resultMap, ok := result.(map[string]interface{})
+				if !ok {
+					t.Errorf("Expected map, got %T", result)
+					return
+				}
+				if resultMap["utc"] != true {
+					t.Error("UTC should be a valid timezone")
+				}
+				if resultMap["invalid"] != false {
+					t.Error("NotATimezone should not be valid")
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := Execute(tt.code, tt.params)
+			if err != nil {
+				t.Errorf("Execute() framework error = %v", err)
+				return
+			}
+			if tt.wantErr {
+				if result == nil || result.Error == "" {
+					t.Errorf("Execute() expected error in result, got none")
+				}
+				return
+			}
+			if result.Error != "" {
+				t.Errorf("Execute() unexpected error in result: %s", result.Error)
+				return
+			}
+			if tt.check != nil {
+				tt.check(t, result.Result)
+			}
+		})
+	}
+}
+
+func TestExecute_MathModule(t *testing.T) {
+	tests := []struct {
+		name    string
+		code    string
+		params  map[string]interface{}
+		want    interface{}
+		wantErr bool
+		check   func(t *testing.T, result interface{})
+	}{
+		{
+			name: "math.sqrt",
+			code: "math.sqrt(16)",
+			want: 4.0,
+		},
+		{
+			name: "math.ceil",
+			code: "math.ceil(3.2)",
+			want: int64(4),
+		},
+		{
+			name: "math.floor",
+			code: "math.floor(3.8)",
+			want: int64(3),
+		},
+		{
+			name: "math.pow",
+			code: "math.pow(2, 3)",
+			want: 8.0,
+		},
+		{
+			name: "math.round",
+			code: "math.round(3.6)",
+			want: 4.0,
+		},
+		{
+			name: "math.fabs",
+			code: "math.fabs(-5.5)",
+			want: 5.5,
+		},
+		{
+			name: "math constants",
+			code: "math.pi > 3.14 and math.pi < 3.15",
+			want: true,
+		},
+		{
+			name: "math.e constant",
+			code: "math.e > 2.71 and math.e < 2.72",
+			want: true,
+		},
+		{
+			name: "math.sin",
+			code: "math.sin(0)",
+			want: 0.0,
+		},
+		{
+			name: "math.cos",
+			code: "math.cos(0)",
+			want: 1.0,
+		},
+		{
+			name: "math.exp",
+			code: "math.exp(0)",
+			want: 1.0,
+		},
+		{
+			name: "math.log natural log",
+			code: "math.log(math.e)",
+			want: 1.0,
+		},
+		{
+			name: "math.log with base",
+			code: "math.log(100, 10)",
+			want: 2.0,
+		},
+		{
+			name: "math.degrees",
+			code: "math.degrees(math.pi)",
+			want: 180.0,
+		},
+		{
+			name: "math.radians",
+			code: "math.radians(180)",
+			want: nil, // Will check in the check function
+			check: func(t *testing.T, result interface{}) {
+				f, ok := result.(float64)
+				if !ok {
+					t.Errorf("Expected float64, got %T", result)
+					return
+				}
+				// Check if it's approximately pi
+				if f < 3.14 || f > 3.15 {
+					t.Errorf("math.radians(180) = %v, expected approximately pi (3.14159)", f)
+				}
+			},
+		},
+		{
+			name: "math operations in expressions",
+			code: "math.sqrt(math.pow(3, 2) + math.pow(4, 2))",
+			want: 5.0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := Execute(tt.code, tt.params)
+			if err != nil {
+				t.Errorf("Execute() framework error = %v", err)
+				return
+			}
+			if tt.wantErr {
+				if result == nil || result.Error == "" {
+					t.Errorf("Execute() expected error in result, got none")
+				}
+				return
+			}
+			if result.Error != "" {
+				t.Errorf("Execute() unexpected error in result: %s", result.Error)
+				return
+			}
+			if tt.check != nil {
+				tt.check(t, result.Result)
+			} else if tt.want != nil && result.Result != tt.want {
+				t.Errorf("Execute() result = %v (type %T), want %v (type %T)", result.Result, result.Result, tt.want, tt.want)
+			}
+		})
+	}
+}
+
+func TestExecute_JsonModule(t *testing.T) {
+	tests := []struct {
+		name    string
+		code    string
+		params  map[string]interface{}
+		want    interface{}
+		wantErr bool
+		check   func(t *testing.T, result interface{})
+	}{
+		{
+			name: "json.encode dict",
+			code: `json.encode({"key": "value", "number": 42})`,
+			check: func(t *testing.T, result interface{}) {
+				jsonStr, ok := result.(string)
+				if !ok {
+					t.Errorf("Expected string, got %T", result)
+					return
+				}
+				// JSON can order keys differently, so check if it contains the expected parts
+				if !strings.Contains(jsonStr, `"key"`) || !strings.Contains(jsonStr, `"value"`) {
+					t.Errorf("json.encode result doesn't contain expected content: %s", jsonStr)
+				}
+			},
+		},
+		{
+			name: "json.encode list",
+			code: `json.encode([1, 2, 3, "four"])`,
+			want: `[1,2,3,"four"]`,
+		},
+		{
+			name: "json.encode string",
+			code: `json.encode("hello world")`,
+			want: `"hello world"`,
+		},
+		{
+			name: "json.encode number",
+			code: `json.encode(42)`,
+			want: "42",
+		},
+		{
+			name: "json.encode bool",
+			code: `json.encode(True)`,
+			want: "true",
+		},
+		{
+			name: "json.encode null",
+			code: `json.encode(None)`,
+			want: "null",
+		},
+		{
+			name: "json.decode object",
+			code: `json.decode('{"x": 42, "y": "test"}')`,
+			check: func(t *testing.T, result interface{}) {
+				resultMap, ok := result.(map[string]interface{})
+				if !ok {
+					t.Errorf("Expected map, got %T", result)
+					return
+				}
+				if resultMap["x"] != int64(42) {
+					t.Errorf("Expected x=42, got %v", resultMap["x"])
+				}
+				if resultMap["y"] != "test" {
+					t.Errorf("Expected y=test, got %v", resultMap["y"])
+				}
+			},
+		},
+		{
+			name: "json.decode array",
+			code: `json.decode('[1, 2, 3]')`,
+			want: []interface{}{int64(1), int64(2), int64(3)},
+		},
+		{
+			name: "json.decode string",
+			code: `json.decode('"hello"')`,
+			want: "hello",
+		},
+		{
+			name: "json.decode number",
+			code: `json.decode('123')`,
+			want: int64(123),
+		},
+		{
+			name: "json.decode float",
+			code: `json.decode('3.14')`,
+			want: 3.14,
+		},
+		{
+			name: "json.decode bool",
+			code: `json.decode('true')`,
+			want: true,
+		},
+		{
+			name: "json.decode null",
+			code: `json.decode('null')`,
+			want: nil,
+		},
+		{
+			name: "json.indent",
+			code: `json.indent('{"a":1,"b":2}')`,
+			check: func(t *testing.T, result interface{}) {
+				jsonStr, ok := result.(string)
+				if !ok {
+					t.Errorf("Expected string, got %T", result)
+					return
+				}
+				// Check that it contains indentation (tabs or spaces)
+				if !strings.Contains(jsonStr, "\t") && !strings.Contains(jsonStr, "  ") {
+					t.Errorf("json.indent should add indentation: %s", jsonStr)
+				}
+			},
+		},
+		{
+			name: "json encode-decode round trip",
+			code: `data = {"name": "test", "values": [1, 2, 3], "nested": {"key": "value"}}
+encoded = json.encode(data)
+decoded = json.decode(encoded)
+result = decoded`,
+			check: func(t *testing.T, result interface{}) {
+				resultMap, ok := result.(map[string]interface{})
+				if !ok {
+					t.Errorf("Expected map, got %T", result)
+					return
+				}
+				if resultMap["name"] != "test" {
+					t.Errorf("Round trip failed: name = %v", resultMap["name"])
+				}
+			},
+		},
+		{
+			name: "json.decode with nested structures",
+			code: `json.decode('{"users": [{"name": "Alice", "age": 30}, {"name": "Bob", "age": 25}]}')`,
+			check: func(t *testing.T, result interface{}) {
+				resultMap, ok := result.(map[string]interface{})
+				if !ok {
+					t.Errorf("Expected map, got %T", result)
+					return
+				}
+				users, ok := resultMap["users"].([]interface{})
+				if !ok {
+					t.Errorf("Expected users to be array")
+					return
+				}
+				if len(users) != 2 {
+					t.Errorf("Expected 2 users, got %d", len(users))
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := Execute(tt.code, tt.params)
+			if err != nil {
+				t.Errorf("Execute() framework error = %v", err)
+				return
+			}
+			if tt.wantErr {
+				if result == nil || result.Error == "" {
+					t.Errorf("Execute() expected error in result, got none")
+				}
+				return
+			}
+			if result.Error != "" {
+				t.Errorf("Execute() unexpected error in result: %s", result.Error)
+				return
+			}
+			if tt.check != nil {
+				tt.check(t, result.Result)
+			} else if tt.want != nil {
+				// For slices, need to do deep comparison
+				if !deepEqual(result.Result, tt.want) {
+					t.Errorf("Execute() result = %v (type %T), want %v (type %T)", result.Result, result.Result, tt.want, tt.want)
+				}
+			}
+		})
+	}
+}
+
+// Helper function for deep comparison
+func deepEqual(a, b interface{}) bool {
+	// Handle nil cases
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+
+	// Handle slices
+	aSlice, aIsSlice := a.([]interface{})
+	bSlice, bIsSlice := b.([]interface{})
+	if aIsSlice && bIsSlice {
+		if len(aSlice) != len(bSlice) {
+			return false
+		}
+		for i := range aSlice {
+			if !deepEqual(aSlice[i], bSlice[i]) {
+				return false
+			}
+		}
+		return true
+	}
+
+	// Handle maps
+	aMap, aIsMap := a.(map[string]interface{})
+	bMap, bIsMap := b.(map[string]interface{})
+	if aIsMap && bIsMap {
+		if len(aMap) != len(bMap) {
+			return false
+		}
+		for k, v := range aMap {
+			if !deepEqual(v, bMap[k]) {
+				return false
+			}
+		}
+		return true
+	}
+
+	// Default comparison
+	return a == b
+}

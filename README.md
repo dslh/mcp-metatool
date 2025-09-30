@@ -235,6 +235,110 @@ result = {"processed_count": len(processed), "source": params.source}
 
 ## Available Tools
 
+### Starlark Standard Library
+
+All Starlark code has access to these standard library modules:
+
+#### `time` - Date and Time Operations
+
+**Functions:**
+- `time.now()` - Get current system time
+- `time.parse_time(str, format, location)` - Parse time strings (supports ISO 8601)
+  - Default format: RFC3339 (e.g., `"2025-01-15T10:30:00Z"`)
+  - Custom format: Go time format (e.g., `"2006-01-02"`)
+  - Default location: UTC
+- `time.time(year, month, day, hour, minute, second, nanosecond, location)` - Create time values (all parameters optional, use keyword arguments)
+- `time.parse_duration(str)` - Parse duration strings (e.g., `"1h30m"`, `"5s"`)
+- `time.from_timestamp(sec, nsec)` - Convert Unix timestamp to time
+- `time.is_valid_timezone(loc)` - Check if timezone name is valid
+
+**Constants:**
+- `time.nanosecond`, `time.microsecond`, `time.millisecond`
+- `time.second`, `time.minute`, `time.hour`
+
+**Examples:**
+```python
+# Parse ISO 8601 timestamp
+timestamp = time.parse_time("2025-01-15T10:30:00Z")
+
+# Get current time
+now = time.now()
+
+# Create a specific time
+meeting = time.time(year=2025, month=1, day=15, hour=14, minute=30)
+
+# Parse duration
+timeout = time.parse_duration("5m30s")
+
+# Check timezone
+is_valid = time.is_valid_timezone("America/New_York")  # True
+```
+
+#### `math` - Mathematical Functions
+
+**Functions:**
+- Basic: `ceil`, `floor`, `round`, `fabs` (absolute value)
+- Powers: `pow`, `sqrt`, `exp`
+- Trigonometry: `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2`
+- Hyperbolic: `sinh`, `cosh`, `tanh`, `asinh`, `acosh`, `atanh`
+- Logarithms: `log(x, base)` - natural log by default
+- Angles: `degrees`, `radians`
+- Other: `copysign`, `mod`, `remainder`, `hypot`, `gamma`
+
+**Constants:**
+- `math.pi` - π (approximately 3.14159)
+- `math.e` - Euler's number (approximately 2.71828)
+
+**Examples:**
+```python
+# Calculate distance (Pythagorean theorem)
+distance = math.sqrt(math.pow(3, 2) + math.pow(4, 2))  # 5.0
+
+# Trigonometry
+angle_rad = math.radians(45)
+sine = math.sin(angle_rad)
+
+# Logarithms
+log_base_10 = math.log(100, 10)  # 2.0
+natural_log = math.log(math.e)   # 1.0
+
+# Rounding
+rounded_up = math.ceil(3.2)    # 4
+rounded_down = math.floor(3.8)  # 3
+```
+
+#### `json` - JSON Encoding and Decoding
+
+**Functions:**
+- `json.encode(value)` - Convert Starlark value to JSON string
+  - Handles: dicts, lists, strings, numbers, bools, None (→ null)
+- `json.decode(str, default)` - Parse JSON string to Starlark value
+  - Returns `default` if parsing fails (otherwise fails)
+- `json.indent(str, prefix, indent)` - Pretty-print JSON
+  - Default indent: tab character
+  - Optional prefix for each line
+
+**Examples:**
+```python
+# Encode data to JSON
+data = {"name": "Alice", "age": 30, "active": True}
+json_str = json.encode(data)
+# Result: '{"name":"Alice","age":30,"active":true}'
+
+# Decode JSON to Starlark
+parsed = json.decode('{"x": 42, "y": "test"}')
+value = parsed["x"]  # 42
+
+# Pretty-print JSON
+formatted = json.indent(json_str, indent="  ")
+# Result: multi-line indented JSON
+
+# Round-trip with data transformation
+api_response = json.decode(api_data)
+processed = [item for item in api_response["items"] if item["status"] == "active"]
+result = json.encode({"processed": processed})
+```
+
 ### eval_starlark
 
 Execute Starlark code with access to all connected MCP servers.
