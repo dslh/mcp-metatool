@@ -50,11 +50,7 @@ func handleListSavedTools(ctx context.Context, req *mcp.CallToolRequest, args st
 	// Get all saved tools
 	tools, err := persistence.ListTools()
 	if err != nil {
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{Text: fmt.Sprintf("Failed to list saved tools: %v", err)},
-			},
-		}, nil, nil
+		return ErrorResponse("Failed to list saved tools: %v", err), nil, nil
 	}
 
 	// Convert to summary format
@@ -70,11 +66,7 @@ func handleListSavedTools(ctx context.Context, req *mcp.CallToolRequest, args st
 	response := ToolListResponse{Tools: summaries}
 
 	if len(summaries) == 0 {
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{Text: "No saved tools found"},
-			},
-		}, response, nil
+		return SuccessResponse("No saved tools found"), response, nil
 	}
 
 	// Build a readable list of tools
@@ -85,63 +77,35 @@ func handleListSavedTools(ctx context.Context, req *mcp.CallToolRequest, args st
 
 	listText := fmt.Sprintf("Found %d saved tool(s):\n\n%s", len(summaries), strings.Join(toolList, "\n"))
 
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: listText},
-		},
-	}, response, nil
+	return SuccessResponse(listText), response, nil
 }
 
 func handleShowSavedTool(ctx context.Context, req *mcp.CallToolRequest, args types.ShowToolArgs) (*mcp.CallToolResult, any, error) {
 	// Validate arguments
 	if args.Name == "" {
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{Text: "Error: tool name is required"},
-			},
-		}, nil, nil
+		return ErrorResponse("Error: tool name is required"), nil, nil
 	}
 
 	// Load the tool
 	tool, err := persistence.LoadTool(args.Name)
 	if err != nil {
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{Text: fmt.Sprintf("Failed to load tool '%s': %v", args.Name, err)},
-			},
-		}, nil, nil
+		return ErrorResponse("Failed to load tool '%s': %v", args.Name, err), nil, nil
 	}
 
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: tool.Code},
-		},
-	}, tool, nil
+	return SuccessResponse(tool.Code), tool, nil
 }
 
 func handleDeleteSavedTool(ctx context.Context, req *mcp.CallToolRequest, args types.DeleteToolArgs) (*mcp.CallToolResult, any, error) {
 	// Validate arguments
 	if args.Name == "" {
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{Text: "Error: tool name is required"},
-			},
-		}, nil, nil
+		return ErrorResponse("Error: tool name is required"), nil, nil
 	}
 
 	// Delete the tool
 	err := persistence.DeleteTool(args.Name)
 	if err != nil {
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{Text: fmt.Sprintf("Failed to delete tool '%s': %v", args.Name, err)},
-			},
-		}, nil, nil
+		return ErrorResponse("Failed to delete tool '%s': %v", args.Name, err), nil, nil
 	}
 
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: fmt.Sprintf("Tool '%s' deleted successfully. Restart server to remove from available tools.", args.Name)},
-		},
-	}, map[string]string{"deleted": args.Name}, nil
+	return SuccessResponse("Tool '%s' deleted successfully. Restart server to remove from available tools.", args.Name), map[string]string{"deleted": args.Name}, nil
 }

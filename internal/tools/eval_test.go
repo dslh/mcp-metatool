@@ -84,7 +84,7 @@ result = {"original": data, "processed": processed}`,
 			ctx := context.Background()
 			req := &mcp.CallToolRequest{} // Empty request is fine for testing
 
-			result, returnValue, err := handleEvalStarlark(ctx, req, tt.args)
+			result, returnValue, err := handleEvalStarlark(ctx, req, tt.args, nil)
 
 			// Check for framework errors
 			if err != nil {
@@ -147,7 +147,7 @@ func TestRegisterEvalStarlark(t *testing.T) {
 	}, nil)
 
 	// Register the tool
-	RegisterEvalStarlark(server)
+	RegisterEvalStarlark(server, nil)
 
 	// Verify the tool was registered
 	// Note: The MCP SDK doesn't provide direct access to registered tools,
@@ -186,7 +186,7 @@ func TestEvalStarlarkArgs_Validation(t *testing.T) {
 			ctx := context.Background()
 			req := &mcp.CallToolRequest{}
 
-			result, _, err := handleEvalStarlark(ctx, req, tt.args)
+			result, _, err := handleEvalStarlark(ctx, req, tt.args, nil)
 
 			if err != nil {
 				if tt.want == "" {
@@ -279,7 +279,7 @@ result = {
 			ctx := context.Background()
 			req := &mcp.CallToolRequest{}
 
-			result, returnValue, err := handleEvalStarlark(ctx, req, tt.args)
+			result, returnValue, err := handleEvalStarlark(ctx, req, tt.args, nil)
 
 			if err != nil {
 				t.Errorf("handleEvalStarlark() error = %v", err)

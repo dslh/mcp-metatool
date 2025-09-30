@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/dslh/mcp-metatool/internal/paths"
 )
 
 // SavedToolDefinition represents a saved tool
@@ -17,26 +19,9 @@ type SavedToolDefinition struct {
 }
 
 // GetToolsDirectory returns the directory where tools are stored
+// Deprecated: Use paths.GetToolsDir() instead
 func GetToolsDirectory() (string, error) {
-	var toolsDir string
-	
-	// Check for environment variable override first
-	if envDir := os.Getenv("MCP_METATOOL_DIR"); envDir != "" {
-		toolsDir = filepath.Join(envDir, "tools")
-	} else {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			return "", fmt.Errorf("failed to get home directory: %w", err)
-		}
-		toolsDir = filepath.Join(homeDir, ".mcp-metatool", "tools")
-	}
-	
-	// Create directory if it doesn't exist
-	if err := os.MkdirAll(toolsDir, 0755); err != nil {
-		return "", fmt.Errorf("failed to create tools directory: %w", err)
-	}
-	
-	return toolsDir, nil
+	return paths.GetToolsDir()
 }
 
 // SaveTool saves a tool definition to disk

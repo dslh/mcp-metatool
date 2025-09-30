@@ -248,7 +248,7 @@ result = "Processed " + str(len(items)) + " items: " + str(items)`,
 			}
 
 			// Execute the tool
-			result, _, err := handleSavedTool(tool, tt.params)
+			result, _, err := handleSavedTool(tool, tt.params, nil)
 			
 			if tt.expectError {
 				if result == nil || len(result.Content) == 0 {
@@ -314,7 +314,7 @@ func TestHandleSavedTool_RuntimeErrorsAfterValidation(t *testing.T) {
 
 	// Valid parameters should pass validation but then hit runtime error
 	params := types.SavedToolParams{"name": "test"}
-	result, _, err := handleSavedTool(tool, params)
+	result, _, err := handleSavedTool(tool, params, nil)
 	
 	// Should not return Go error, but should have error in result content
 	if err != nil {

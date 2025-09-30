@@ -4,9 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/dslh/mcp-metatool/internal/paths"
 )
 
 // MCPServerConfig represents a single MCP server configuration
@@ -25,26 +26,9 @@ type Config struct {
 }
 
 // GetMetatoolDirectory returns the directory where metatool files are stored
+// Deprecated: Use paths.GetMetatoolDir() instead
 func GetMetatoolDirectory() (string, error) {
-	var metatoolDir string
-	
-	// Check for environment variable override first
-	if envDir := os.Getenv("MCP_METATOOL_DIR"); envDir != "" {
-		metatoolDir = envDir
-	} else {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			return "", fmt.Errorf("failed to get home directory: %w", err)
-		}
-		metatoolDir = filepath.Join(homeDir, ".mcp-metatool")
-	}
-	
-	// Create directory if it doesn't exist
-	if err := os.MkdirAll(metatoolDir, 0755); err != nil {
-		return "", fmt.Errorf("failed to create metatool directory: %w", err)
-	}
-	
-	return metatoolDir, nil
+	return paths.GetMetatoolDir()
 }
 
 // LoadConfig loads and parses the MCP configuration file
@@ -69,12 +53,11 @@ func LoadConfig(configPath string) (*Config, error) {
 
 // LoadDefaultConfig loads the configuration from the default location
 func LoadDefaultConfig() (*Config, error) {
-	metatoolDir, err := GetMetatoolDirectory()
+	configPath, err := paths.GetConfigPath()
 	if err != nil {
 		return nil, err
 	}
-	
-	configPath := filepath.Join(metatoolDir, "servers.json")
+
 	return LoadConfig(configPath)
 }
 

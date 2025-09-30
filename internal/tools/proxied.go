@@ -134,11 +134,7 @@ func handleProxiedTool(proxyManager ProxyManager, serverName, toolName string, a
 	// Forward the call to the upstream server
 	result, err := proxyManager.CallTool(serverName, toolName, map[string]interface{}(args))
 	if err != nil {
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{Text: fmt.Sprintf("Proxied tool call failed: %v", err)},
-			},
-		}, nil, nil
+		return ErrorResponse("Proxied tool call failed: %v", err), nil, nil
 	}
 
 	// Return the result from the upstream server

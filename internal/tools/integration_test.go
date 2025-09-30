@@ -73,7 +73,7 @@ func TestEvalStarlarkWithProxyIntegration(t *testing.T) {
 		Version: "1.0.0",
 	}, nil)
 
-	RegisterEvalStarlarkWithProxy(server, mockProxy)
+	RegisterEvalStarlark(server, mockProxy)
 
 	// Test calling the tool with a Starlark script that uses proxied tools
 	ctx := context.Background()
@@ -98,7 +98,7 @@ result
 	
 	req := &mcp.CallToolRequest{}
 
-	result, _, err := handleEvalStarlarkWithProxy(ctx, req, args, mockProxy)
+	result, _, err := handleEvalStarlark(ctx, req, args, mockProxy)
 	if err != nil {
 		t.Errorf("handleEvalStarlarkWithProxy failed: %v", err)
 	}
@@ -155,18 +155,18 @@ func TestEvalStarlarkWithoutProxy(t *testing.T) {
 		Version: "1.0.0",
 	}, nil)
 
-	RegisterEvalStarlark(server)
+	RegisterEvalStarlark(server, nil)
 
 	ctx := context.Background()
 	code := "2 + 3 * 4"
-	
+
 	args := EvalStarlarkArgs{
 		Code: code,
 	}
-	
+
 	req := &mcp.CallToolRequest{}
 
-	result, _, err := handleEvalStarlark(ctx, req, args)
+	result, _, err := handleEvalStarlark(ctx, req, args, nil)
 	if err != nil {
 		t.Errorf("handleEvalStarlark failed: %v", err)
 	}
@@ -226,7 +226,7 @@ result
 		"url": "https://api.example.com/data",
 	}
 
-	result, _, err := handleSavedToolWithProxy(toolDef, args, mockProxy)
+	result, _, err := handleSavedTool(toolDef, args, mockProxy)
 	if err != nil {
 		t.Errorf("handleSavedToolWithProxy failed: %v", err)
 	}

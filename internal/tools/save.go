@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -21,27 +20,15 @@ func RegisterSaveTool(server *mcp.Server) {
 func handleSaveTool(ctx context.Context, req *mcp.CallToolRequest, args types.SaveToolArgs) (*mcp.CallToolResult, any, error) {
 	// Basic validation
 	if args.Name == "" {
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{Text: "Error: tool name is required"},
-			},
-		}, nil, nil
+		return ErrorResponse("Error: tool name is required"), nil, nil
 	}
 
 	if args.Description == "" {
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{Text: "Error: tool description is required"},
-			},
-		}, nil, nil
+		return ErrorResponse("Error: tool description is required"), nil, nil
 	}
 
 	if args.Code == "" {
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{Text: "Error: tool code is required"},
-			},
-		}, nil, nil
+		return ErrorResponse("Error: tool code is required"), nil, nil
 	}
 
 	// Create tool definition
@@ -54,16 +41,8 @@ func handleSaveTool(ctx context.Context, req *mcp.CallToolRequest, args types.Sa
 
 	// Save to disk
 	if err := persistence.SaveTool(tool); err != nil {
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{Text: fmt.Sprintf("Failed to save tool: %v", err)},
-			},
-		}, nil, nil
+		return ErrorResponse("Failed to save tool: %v", err), nil, nil
 	}
 
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: fmt.Sprintf("Tool '%s' saved successfully", args.Name)},
-		},
-	}, tool, nil
+	return SuccessResponse("Tool '%s' saved successfully", args.Name), tool, nil
 }
